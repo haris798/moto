@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
-          cache: npm
 
       - name: Verify Node
         run: |
@@ -67,7 +66,6 @@ jobs:
 
       - name: Read App Name
         run: |
-          # Hardcode the app name since extracting from .ts is tricky without compiling
           APP_NAME="Motorku"
           SAFE_NAME=$(echo "$APP_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
           echo "APP_NAME=$SAFE_NAME" >> $GITHUB_ENV

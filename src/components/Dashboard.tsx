@@ -9,7 +9,8 @@ import {
 import {
   Gauge, Droplets, Fuel, AlertTriangle, CheckCircle2, TrendingUp, Coins, Activity,
   RefreshCw, Timer, Zap, Flame,
-  Battery, Wrench, Clock, Target, Milestone, Satellite, Calendar
+  Battery, Wrench, Clock, Target, Milestone, Satellite, Calendar,
+  Filter, CalendarDays, SlidersHorizontal, ChevronDown, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -204,45 +205,109 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
   const thisMonthKm = jarakMonthMap.get(thisMonthKey) || 0;
   const totalKm = jarakData.reduce((sum, r) => sum + r.total_km, 0);
 
-  // ── Calculation for Current Month (Bulan Berjalan) from Log Data ──
+  // ── Filter Rentang Tanggal (Date Range Filter) ─────────────────────────────
+  type TimeFilterMode = '7d' | 'month' | '30d' | '3m' | 'year' | 'all' | 'custom';
+  const [timeFilterMode, setTimeFilterMode] = useState<TimeFilterMode>('month');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
+
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
   const currentMonthName = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
-  const thisMonthFuelLogs = fuelLogs.filter(l => {
-    const d = new Date(l.date);
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-  });
-  const thisMonthFuelCost = thisMonthFuelLogs.reduce((sum, l) => sum + l.cost, 0);
-  const thisMonthFuelLiters = thisMonthFuelLogs.reduce((sum, l) => sum + l.liters, 0);
+  const getDateRangeBounds = () => {
+    let start: Date | null = null;
+    let end: Date | null = new Date();
+    end.setHours(23, 59, 59, 999);
 
-  const thisMonthOilLogs = oilLogs.filter(l => {
-    const d = new Date(l.date);
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-  });
-  const thisMonthOilCost = thisMonthOilLogs.reduce((sum, l) => sum + l.cost, 0);
+    if (timeFilterMode === '7d') {
+      start = new Date();
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+    } else if (timeFilterMode === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (timeFilterMode === '30d') {
+      start = new Date();
+      start.setDate(start.getDate() - 29);
+      start.setHours(0, 0, 0, 0);
+    } else if (timeFilterMode === '3m') {
+      start = new Date();
+      start.setDate(start.getDate() - 89);
+      start.setHours(0, 0, 0, 0);
+    } else if (timeFilterMode === 'year') {
+      start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    } else if (timeFilterMode === 'all') {
+      start = null;
+      end = null;
+    } else if (timeFilterMode === 'custom') {
+      start = customStartDate ? new Date(`${customStartDate}T00:00:00`) : null;
+      end = customEndDate ? new Date(`${customEndDate}T23:59:59`) : null;
+    }
 
-  // Odometer difference in current month based on fuel/oil logs
+    return { start, end };
+  };
+
+  const { start: filterStartDate, end: filterEndDate } = getDateRangeBounds();
+
+  const isDateInRange = (dateStr: string) => {
+    if (!filterStartDate && !filterEndDate) return true;
+    const d = new Date(dateStr);
+    if (filterStartDate && d < filterStartDate) return false;
+    if (filterEndDate && d > filterEndDate) return false;
+    return true;
+  };
+
+  const filteredFuelLogs = fuelLogs.filter(l => isDateInRange(l.date));
+  const filteredOilLogs = oilLogs.filter(l => isDateInRange(l.date));
+  const filteredJarakData = jarakData.filter(r => isDateInRange(r.date));
+
+  const filteredFuelCost = filteredFuelLogs.reduce((sum, l) => sum + l.cost, 0);
+  const filteredFuelLiters = filteredFuelLogs.reduce((sum, l) => sum + l.liters, 0);
+  const filteredOilCost = filteredOilLogs.reduce((sum, l) => sum + l.cost, 0);
+  const filteredTotalOperational = filteredFuelCost + filteredOilCost;
+
+  const filteredEffLogs = filteredFuelLogs.filter(l => l.efficiency && l.efficiency > 0);
+  const filteredAvgEfficiency = filteredEffLogs.length > 0
+    ? filteredEffLogs.reduce((sum, l) => sum + (l.efficiency || 0), 0) / filteredEffLogs.length
+    : 0;
+
+  const filteredJarakKm = filteredJarakData.reduce((sum, r) => sum + r.total_km, 0);
+
   const allLogsAsc = [...oilLogs, ...fuelLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const thisMonthLogs = allLogsAsc.filter(l => {
-    const d = new Date(l.date);
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-  });
-  const prevLogs = allLogsAsc.filter(l => {
-    const d = new Date(l.date);
-    return d.getFullYear() < currentYear || (d.getFullYear() === currentYear && d.getMonth() < currentMonth);
-  });
+  const rangeLogs = allLogsAsc.filter(l => isDateInRange(l.date));
 
-  let thisMonthLogKm = 0;
-  if (thisMonthLogs.length > 0) {
-    const maxMonthMileage = Math.max(...thisMonthLogs.map(l => l.mileage));
-    const minMonthMileage = Math.min(...thisMonthLogs.map(l => l.mileage));
-    const lastPrevMileage = prevLogs.length > 0 ? Math.max(...prevLogs.map(l => l.mileage)) : minMonthMileage;
-    thisMonthLogKm = Math.max(0, maxMonthMileage - lastPrevMileage);
+  let filteredLogKm = 0;
+  if (rangeLogs.length >= 2) {
+    const maxMileageInRange = Math.max(...rangeLogs.map(l => l.mileage));
+    const minMileageInRange = Math.min(...rangeLogs.map(l => l.mileage));
+    filteredLogKm = Math.max(0, maxMileageInRange - minMileageInRange);
+  } else if (rangeLogs.length === 1 && filterStartDate) {
+    const priorLogs = allLogsAsc.filter(l => new Date(l.date) < filterStartDate);
+    if (priorLogs.length > 0) {
+      const lastPriorMileage = Math.max(...priorLogs.map(l => l.mileage));
+      filteredLogKm = Math.max(0, rangeLogs[0].mileage - lastPriorMileage);
+    }
   }
 
-  const totalThisMonthKm = Math.max(thisMonthKm, thisMonthLogKm);
+  const filteredTotalKm = Math.max(filteredJarakKm, filteredLogKm);
+
+  const getPeriodLabel = () => {
+    switch (timeFilterMode) {
+      case '7d': return '7 Hari Terakhir (Mingguan)';
+      case 'month': return `Bulan Ini (${currentMonthName})`;
+      case '30d': return '30 Hari Terakhir';
+      case '3m': return '3 Bulan Terakhir';
+      case 'year': return `Tahun ${currentYear}`;
+      case 'all': return 'Semua Periode';
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return `${new Date(customStartDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} - ${new Date(customEndDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        }
+        return 'Rentang Tanggal Kustom';
+    }
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -429,109 +494,204 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
         )}
       </AnimatePresence>
 
-      {/* ═══════════════════════ 2.5 RINGKASAN BULAN BERJALAN ═══════════════════════ */}
-      <motion.div variants={fadeUp} className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
-              <Calendar className="w-4 h-4" />
+      {/* ═══════════════════════ 2.5 FILTER RENTANG TANGGAL & RINGKASAN PERIODE ═══════════════════════ */}
+      <motion.div variants={fadeUp} className="space-y-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 p-4 md:p-6 shadow-sm">
+        {/* Header & Title */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800/60">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              <Filter className="w-5 h-5" />
             </div>
-            <h2 className="text-base font-bold text-slate-800 dark:text-white font-display">
-              Ringkasan Bulan Berjalan ({currentMonthName})
-            </h2>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-display">
+                Ringkasan & Filter Periode
+              </h2>
+              <p className="text-xs text-slate-400">
+                Filter biaya BBM, oli, dan jarak tempuh berdasarkan rentang waktu
+              </p>
+            </div>
           </div>
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-200/50 dark:border-slate-700/50">
-            Bulan Ini
-          </span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-900/40 text-xs font-semibold self-start sm:self-auto">
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>{getPeriodLabel()}</span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-          {/* Kartu 1: Total Biaya BBM Bulan Berjalan */}
+        {/* Quick Filter Preset Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {[
+            { mode: '7d', label: 'Mingguan (7 Hari)' },
+            { mode: 'month', label: 'Bulan Ini' },
+            { mode: '30d', label: '30 Hari' },
+            { mode: '3m', label: '3 Bulan' },
+            { mode: 'year', label: `Tahun ${currentYear}` },
+            { mode: 'all', label: 'Semua' },
+            { mode: 'custom', label: 'Kustom Tanggal' },
+          ].map((item) => {
+            const isActive = timeFilterMode === item.mode;
+            return (
+              <button
+                key={item.mode}
+                onClick={() => setTimeFilterMode(item.mode as TimeFilterMode)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                  isActive
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20'
+                    : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom Date Range Picker */}
+        <AnimatePresence>
+          {timeFilterMode === 'custom' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden pt-2"
+            >
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50 grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Tanggal Mulai
+                  </label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Tanggal Sampai
+                  </label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Summary Metric Cards for Selected Filter Range */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 pt-1">
+          {/* Card 1: Biaya BBM */}
           <motion.div
             variants={scaleIn}
-            whileHover={{ y: -3, transition: { duration: 0.2 } }}
-            className="group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-4 md:p-5 shadow-xs hover:shadow-md transition-all duration-300"
+            whileHover={{ y: -2 }}
+            className="group relative overflow-hidden rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/50 p-4 shadow-2xs hover:shadow-sm transition-all"
           >
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-600 opacity-80" />
-            <div className="flex items-start justify-between mb-3">
-              <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 transition-transform duration-300 group-hover:scale-110">
-                <Fuel className="w-5 h-5" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-600" />
+            <div className="flex items-start justify-between mb-2">
+              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <Fuel className="w-4 h-4" />
               </div>
-              <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
-                {thisMonthFuelLogs.length}x Pengisian
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                {filteredFuelLogs.length}x Pengisian
               </span>
             </div>
-            <span className="block text-xs font-medium text-slate-400 dark:text-slate-500 tracking-wider mb-1">
-              Biaya BBM Bulan Ini
+            <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-400 tracking-wider mb-1">
+              Biaya BBM
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                {formatIDR(thisMonthFuelCost)}
-              </span>
+            <div className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tabular-nums">
+              {formatIDR(filteredFuelCost)}
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
-              {thisMonthFuelLiters > 0
-                ? `${thisMonthFuelLiters.toFixed(1)} Liter bensin terpakai`
-                : 'Belum ada transaksi BBM bulan ini'}
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 truncate">
+              {filteredFuelLiters > 0
+                ? `${filteredFuelLiters.toFixed(1)} Liter terpakai`
+                : 'Tidak ada pengisian di periode ini'}
             </p>
           </motion.div>
 
-          {/* Kartu 2: Total Jarak Tempuh Bulan Berjalan */}
+          {/* Card 2: Jarak Tempuh */}
           <motion.div
             variants={scaleIn}
-            whileHover={{ y: -3, transition: { duration: 0.2 } }}
-            className="group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-4 md:p-5 shadow-xs hover:shadow-md transition-all duration-300"
+            whileHover={{ y: -2 }}
+            className="group relative overflow-hidden rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/50 p-4 shadow-2xs hover:shadow-sm transition-all"
           >
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-600 opacity-80" />
-            <div className="flex items-start justify-between mb-3">
-              <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 transition-transform duration-300 group-hover:scale-110">
-                <Milestone className="w-5 h-5" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-600" />
+            <div className="flex items-start justify-between mb-2">
+              <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <Milestone className="w-4 h-4" />
               </div>
-              <span className="text-[11px] font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-lg border border-blue-200/60 dark:border-blue-900/40">
+              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
                 Jarak Tempuh
               </span>
             </div>
-            <span className="block text-xs font-medium text-slate-400 dark:text-slate-500 tracking-wider mb-1">
-              Total Jarak Bulan Ini
+            <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-400 tracking-wider mb-1">
+              Jarak Periode Ini
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                <AnimatedCounter value={totalThisMonthKm} decimals={totalThisMonthKm % 1 !== 0 ? 1 : 0} />
-                <span className="text-sm font-normal text-slate-400 ml-1">km</span>
-              </span>
+            <div className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tabular-nums flex items-baseline gap-1">
+              <AnimatedCounter value={filteredTotalKm} decimals={filteredTotalKm % 1 !== 0 ? 1 : 0} />
+              <span className="text-xs font-normal text-slate-400">km</span>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
-              {thisMonthLogs.length > 0
-                ? `Berdasarkan ${thisMonthLogs.length} catatan log pengisian bulan ini`
-                : 'Estimasi jarak berdasarkan log & rekaman harian'}
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 truncate">
+              {rangeLogs.length > 0
+                ? `${rangeLogs.length} catatan dalam periode`
+                : 'Belum ada catatan jarak'}
             </p>
           </motion.div>
 
-          {/* Kartu 3: Total Pengeluaran Operasional Bulan Berjalan */}
+          {/* Card 3: Total Operasional */}
           <motion.div
             variants={scaleIn}
-            whileHover={{ y: -3, transition: { duration: 0.2 } }}
-            className="group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-4 md:p-5 shadow-xs hover:shadow-md transition-all duration-300 sm:col-span-2 lg:col-span-1"
+            whileHover={{ y: -2 }}
+            className="group relative overflow-hidden rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/50 p-4 shadow-2xs hover:shadow-sm transition-all"
           >
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-600 opacity-80" />
-            <div className="flex items-start justify-between mb-3">
-              <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 transition-transform duration-300 group-hover:scale-110">
-                <Coins className="w-5 h-5" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-600" />
+            <div className="flex items-start justify-between mb-2">
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <Coins className="w-4 h-4" />
               </div>
-              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200/60 dark:border-emerald-900/40">
+              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
                 Total Operasional
               </span>
             </div>
-            <span className="block text-xs font-medium text-slate-400 dark:text-slate-500 tracking-wider mb-1">
-              Total Biaya Bulan Ini
+            <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-400 tracking-wider mb-1">
+              Total Pengeluaran
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                {formatIDR(thisMonthFuelCost + thisMonthOilCost)}
+            <div className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tabular-nums">
+              {formatIDR(filteredTotalOperational)}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 truncate">
+              BBM {formatIDR(filteredFuelCost)} • Oli {formatIDR(filteredOilCost)}
+            </p>
+          </motion.div>
+
+          {/* Card 4: Rata-rata Efisiensi */}
+          <motion.div
+            variants={scaleIn}
+            whileHover={{ y: -2 }}
+            className="group relative overflow-hidden rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/50 p-4 shadow-2xs hover:shadow-sm transition-all"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-600" />
+            <div className="flex items-start justify-between mb-2">
+              <div className="p-2 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <span className="text-[10px] font-bold text-violet-700 dark:text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-md border border-violet-500/20">
+                Efisiensi
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
-              BBM: {formatIDR(thisMonthFuelCost)} • Oli: {formatIDR(thisMonthOilCost)}
+            <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-400 tracking-wider mb-1">
+              Rata-rata Konsumsi
+            </span>
+            <div className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tabular-nums">
+              {filteredAvgEfficiency > 0 ? `${filteredAvgEfficiency.toFixed(1)} km/L` : '—'}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 truncate">
+              {filteredEffLogs.length > 0
+                ? `${filteredEffLogs.length} log efisiensi terhitung`
+                : 'Belum cukup log BBM'}
             </p>
           </motion.div>
         </div>

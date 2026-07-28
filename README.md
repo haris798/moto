@@ -10,8 +10,9 @@ Aplikasi ini dirancang dengan pendekatan *Offline-First* serta mendukung sinkron
 
 ### 1. 📊 Dashboard Performa & Ringkasan Perawatan
 - **Status Kesehatan Oli**: Indikator persentase kondisi oli berdasarkan sisa kilometer dan sisa hari.
-- **Statistik Pengeluaran**: Ringkasan total biaya pengisian BBM dan ganti oli dalam rentang waktu yang dipilih.
-- **Ringkasan Jarak Tempuh**: Estimasi penggunaan harian dan total jarak kendaraan.
+- **Filter Rentang Tanggal**: Pilihan filter periode cepat (Mingguan 7 Hari, Bulan Ini, 30 Hari, 3 Bulan, Tahun Ini, Semua Data) dan pemilih tanggal kustom (*Start Date & End Date*).
+- **Ringkasan Operasional**: Perhitungan otomatis biaya BBM, biaya oli, total pengeluaran operasional, jarak tempuh, dan rata-rata efisiensi BBM (km/L) sesuai periode yang dipilih.
+- **Grafik Interaktif**: Visualisasi tren pengeluaran bulanan dan efisiensi BBM.
 
 ### 2. 🛢️ Pencatatan Servis & Ganti Oli
 - Pencatatan tanggal servis, jarak tempuh (km), merek & tipe oli, biaya, dan rating performa oli.
