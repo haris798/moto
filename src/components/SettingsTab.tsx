@@ -20,6 +20,8 @@ interface SettingsTabProps {
   onLogout: () => void;
 }
 
+// ─── Component ───────────────────────────────────────────────────────────────
+// Tab Pengaturan untuk mengelola interval ganti oli, koneksi cloud Supabase, dan bot Telegram.
 export default function SettingsTab({
   settings,
   syncStatus,
@@ -31,18 +33,18 @@ export default function SettingsTab({
   onOpenAuth,
   onLogout
 }: SettingsTabProps) {
-  // Local form state for Supabase
+  // Local form state untuk sinkronisasi Database Supabase
   const [supabaseUrl, setSupabaseUrl] = useState(settings.supabase.url);
   const [supabaseKey, setSupabaseKey] = useState(settings.supabase.anonKey);
   const [showKey, setShowKey] = useState(false);
   const [dbConnecting, setDbConnecting] = useState(false);
   const [dbMessage, setDbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Auth local state
+  // Auth local state untuk autentikasi Supabase
   const [authEmail, setAuthEmail] = useState(settings.supabase.email || '');
   const [authPassword, setAuthPassword] = useState(settings.supabase.password || '');
 
-  // Local form state for Telegram
+  // Local form state untuk Notifikasi Telegram Bot
   const [tgToken, setTgToken] = useState(settings.telegram.botToken);
   const [tgChatId, setTgChatId] = useState(settings.telegram.chatId);
   const [tgEnabled, setTgEnabled] = useState(settings.telegram.enabled);
@@ -52,7 +54,7 @@ export default function SettingsTab({
   const [tgTesting, setTgTesting] = useState(false);
   const [tgMessage, setTgMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Local form state for Intervals
+  // Local form state untuk Interval (Jarak/Hari)
   const [intervalKm, setIntervalKm] = useState(settings.oilChangeIntervalKm);
   const [intervalDays, setIntervalDays] = useState(settings.oilChangeIntervalDays);
   const [fuelPrice, setFuelPrice] = useState(settings.fuelPricePerLiter || 10);

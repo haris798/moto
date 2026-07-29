@@ -206,6 +206,8 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
   const totalKm = jarakData.reduce((sum, r) => sum + r.total_km, 0);
 
   // ── Filter Rentang Tanggal (Date Range Filter) ─────────────────────────────
+  // Fitur ini memungkinkan pengguna untuk memfilter data biaya, oli, dan jarak tempuh 
+  // berdasarkan rentang waktu tertentu, memberikan fleksibilitas analisis yang lebih baik.
   type TimeFilterMode = '7d' | 'month' | '30d' | '3m' | 'year' | 'all' | 'custom';
   const [timeFilterMode, setTimeFilterMode] = useState<TimeFilterMode>('month');
   const [customStartDate, setCustomStartDate] = useState<string>('');
@@ -345,7 +347,7 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
                     Dashboard Motor
                   </h1>
                   <p className="text-indigo-200/80 dark:text-slate-400 text-sm mt-0.5">
-                    Pantau performa, efisiensi, dan biaya perawatan motor Anda
+                    Pantau efisiensi dan biaya perawatan motor Anda
                   </p>
                 </div>
               </div>

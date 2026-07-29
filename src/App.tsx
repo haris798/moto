@@ -33,7 +33,8 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export default function App() {
-  // 1. Core States
+  // 1. State Inti (Core States)
+  // Menyimpan data riwayat oli, BBM, pengaturan, status user, dan state UI
   const [oilLogs, setOilLogs] = useState<OilLog[]>([]);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -43,7 +44,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Sync state tracking
+  // Status sinkronisasi ke cloud database (Supabase)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     lastSyncedAt: null,
     pendingSyncCount: 0,
@@ -58,9 +59,10 @@ export default function App() {
     { id: 'settings', label: 'Pengaturan', icon: Settings },
   ];
 
-  // 2. Load cached data on mount
+  // 2. Inisialisasi Data pada saat komponen dimuat (Mount)
+  // Memuat pengaturan dan log yang tersimpan di localStorage (Offline-First)
   useEffect(() => {
-    // A. Load Local Settings
+    // A. Memuat pengaturan lokal
     const cachedSettings = localStorage.getItem('oil_tracker_settings');
     let loadedSettings = DEFAULT_SETTINGS;
     if (cachedSettings) {
@@ -73,7 +75,7 @@ export default function App() {
       }
     }
 
-    // B. Load Logs
+    // B. Memuat Riwayat Oli dan BBM
     const cachedOil = localStorage.getItem('oil_tracker_oil_logs');
     if (cachedOil) {
       try {
@@ -88,7 +90,7 @@ export default function App() {
       } catch (e) { }
     }
 
-    // C. Setup Theme
+    // C. Konfigurasi Tema (Terang/Gelap)
     const isDark = loadedSettings.theme === 'dark' || localStorage.getItem('oil_tracker_theme') === 'dark';
     setDarkMode(isDark);
     if (isDark) {
@@ -97,7 +99,7 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
 
-    // D. Fetch Supabase User Session if configured
+    // D. Mengecek sesi pengguna di Supabase jika sudah login
     const client = getSupabaseClient();
     if (client) {
       client.auth.getUser().then(async ({ data: { user: sbUser } }) => {
@@ -154,7 +156,8 @@ export default function App() {
     }));
   }, [oilLogs, fuelLogs]);
 
-  // 3. Online/Offline events
+  // 3. Listener Status Jaringan (Online/Offline)
+  // Membantu untuk menunda atau mengaktifkan sinkronisasi Supabase secara otomatis
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -174,7 +177,8 @@ export default function App() {
     };
   }, [settings.supabase.connected, user, oilLogs, fuelLogs]);
 
-  // 4. Periodically check for Telegram Alerts on app load / log updates
+  // 4. Pengecekan Peringatan Telegram
+  // Akan diperiksa secara periodik atau setelah pembaruan log untuk mengirimkan notifikasi
   useEffect(() => {
     if (settings.telegram.enabled && oilLogs.length > 0) {
       const maxOilMileage = Math.max(...oilLogs.map(l => l.mileage));
@@ -515,7 +519,7 @@ export default function App() {
               </span>
               <div>
                 <h1 className="text-sm font-black tracking-tight text-slate-900 dark:text-white font-display leading-none">
-                  Motor.ku Tracker
+                  Motor.ku
                 </h1>
                 <span className="text-[11px] text-slate-400 dark:text-slate-500">Jurnal BBM</span>
               </div>

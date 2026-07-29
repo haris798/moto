@@ -5,6 +5,7 @@ let supabaseInstance: SupabaseClient | null = null;
 let currentUrl = '';
 let currentKey = '';
 
+// Mengelola inisialisasi dan pengambilan instance dari Supabase Client
 export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClient | null {
   // Try to load from provided args or localStorage
   const defaultUrl = 'https://pcoyvfhcniscynjkndlw.supabase.co';

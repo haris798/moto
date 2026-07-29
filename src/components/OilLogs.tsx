@@ -30,12 +30,17 @@ const scaleIn = {
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
+// Komponen utama untuk mengelola pencatatan riwayat ganti oli kendaraan.
+// Mendukung penambahan, pengeditan, penghapusan, pencarian, dan filter data oli.
 export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settings }: OilLogsProps) {
+  // State lokal untuk manajemen modal form (Tambah/Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [cost, setCost] = useState<number | ''>('');
   const [formError, setFormError] = useState<string | null>(null);
+  
+  // State lokal untuk pencarian, filter, dan urutan
   const [searchQuery, setSearchQuery] = useState('');
   const [brandFilter, setBrandFilter] = useState('All');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');

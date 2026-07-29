@@ -72,13 +72,18 @@ const getEfficiencyBadge = (eff: number | undefined) => {
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
+// Komponen utama untuk mengelola pencatatan riwayat pembelian BBM kendaraan.
+// Menghitung dan melacak efisiensi konsumsi bahan bakar (km/L) berdasarkan data perjalanan.
 export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, settings }: FuelLogsProps) {
+  // State lokal untuk manajemen modal form (Tambah/Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [cost, setCost] = useState<number | ''>('');
   const [formError, setFormError] = useState<string | null>(null);
-  const [effCalculating, setEffCalculating] = useState(false);
+  const [effCalculating, setEffCalculating] = useState(false); // Status kalkulasi efisiensi
+  
+  // State lokal untuk pencarian, filter jenis bahan bakar, dan urutan
   const [searchQuery, setSearchQuery] = useState('');
   const [fuelTypeFilter, setFuelTypeFilter] = useState('All');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
