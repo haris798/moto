@@ -212,10 +212,25 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const [jarakLoading, setJarakLoading] = useState(false);
 
   const loadJarak = async () => {
+    // 1. Load from local DB (localStorage) immediately
+    try {
+      const cached = localStorage.getItem('oil_tracker_jarak');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setJarakData(parsed);
+        }
+      }
+    } catch { /* ignore */ }
+
+    // 2. Fetch from Supabase (field total_km) and copy result to local DB
     setJarakLoading(true);
     try {
       const { records, error } = await fetchJarakRecords();
-      if (!error) setJarakData(records);
+      if (!error && Array.isArray(records)) {
+        setJarakData(records);
+        localStorage.setItem('oil_tracker_jarak', JSON.stringify(records));
+      }
     } catch { /* ignore */ }
     finally { setJarakLoading(false); }
   };

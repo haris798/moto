@@ -106,7 +106,7 @@ export default function SettingsTab({
 
       // Attempt login if email and password are provided
       if (authEmail.trim() && authPassword.trim()) {
-        const client = getSupabaseClient();
+        const client = getSupabaseClient(supabaseUrl.trim(), supabaseKey.trim());
         if (client) {
           try {
             const { error: signInError } = await client.auth.signInWithPassword({
@@ -114,15 +114,31 @@ export default function SettingsTab({
               password: authPassword.trim(),
             });
             if (signInError) {
-              setDbMessage({ type: 'error', text: `Tersambung ke Supabase, tetapi gagal login: ${signInError.message}` });
+              if (signInError.message.toLowerCase().includes('invalid login credentials') || signInError.message.toLowerCase().includes('invalid credentials')) {
+                const { data: signUpData, error: signUpError } = await client.auth.signUp({
+                  email: authEmail.trim(),
+                  password: authPassword.trim(),
+                });
+                if (signUpError) {
+                  setDbMessage({ type: 'error', text: `Tersambung ke Supabase, tetapi gagal masuk/daftar: ${signUpError.message}` });
+                } else if (signUpData.user) {
+                  setDbMessage({ type: 'success', text: 'Berhasil mendaftar akun baru dan terhubung ke Supabase!' });
+                  setTimeout(() => onTriggerSync(), 500);
+                }
+              } else {
+                setDbMessage({ type: 'error', text: `Tersambung ke Supabase, tetapi gagal login: ${signInError.message}` });
+              }
             } else {
               setDbMessage({ type: 'success', text: 'Berhasil terhubung ke Supabase dan masuk akun!' });
+              setTimeout(() => onTriggerSync(), 500);
             }
           } catch (err: any) {
             console.error(err);
             setDbMessage({ type: 'error', text: `Gagal login: ${err.message}` });
           }
         }
+      } else {
+        setTimeout(() => onTriggerSync(), 500);
       }
     } else {
       setDbMessage({ type: 'error', text: result.message });

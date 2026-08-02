@@ -273,6 +273,9 @@ export default function App() {
           setServiceLogs(result.syncedServiceLogs);
           localStorage.setItem('oil_tracker_service_logs', JSON.stringify(result.syncedServiceLogs));
         }
+        if (result.syncedJarakRecords) {
+          localStorage.setItem('oil_tracker_jarak', JSON.stringify(result.syncedJarakRecords));
+        }
 
         localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(result.syncedOilLogs));
         localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(result.syncedFuelLogs));

@@ -83,6 +83,7 @@ export async function syncWithSupabase(
   syncedOilLogs: OilLog[];
   syncedFuelLogs: FuelLog[];
   syncedServiceLogs: ServiceLog[];
+  syncedJarakRecords?: Jarak[];
   success: boolean;
   message: string;
 }> {
@@ -426,6 +427,78 @@ export async function syncWithSupabase(
     mergedFuelLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     mergedServiceLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+    // 5. Sync Jarak Tempuh (total_km)
+    onSyncProgress('Sinkronisasi data jarak tempuh (total_km)...');
+    let localJarakRecords: Jarak[] = [];
+    try {
+      const cachedJarak = localStorage.getItem('oil_tracker_jarak');
+      if (cachedJarak) localJarakRecords = JSON.parse(cachedJarak);
+    } catch (e) {}
+
+    const { data: remoteJarakRecords, error: jarakError } = await client
+      .from('jarak')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (jarakError) {
+      console.warn(`Sinkronisasi jarak diabaikan: ${jarakError.message}`);
+    }
+
+    const safeRemoteJarak = Array.isArray(remoteJarakRecords) ? remoteJarakRecords : [];
+    const safeLocalJarak = Array.isArray(localJarakRecords) ? localJarakRecords : [];
+
+    const mergedJarakMap = new Map<string, Jarak>();
+
+    for (const remote of safeRemoteJarak) {
+      mergedJarakMap.set(remote.id || `${remote.date}_${remote.source}`, {
+        id: remote.id,
+        user_id: remote.user_id,
+        date: remote.date,
+        total_km: Number(remote.total_km || 0),
+        source: remote.source || 'colota',
+        created_at: remote.created_at,
+        updated_at: remote.updated_at
+      });
+    }
+
+    for (const local of safeLocalJarak) {
+      const key = local.id || `${local.date}_${local.source}`;
+      const remote = mergedJarakMap.get(key);
+      if (!remote) {
+        // Local only -> push to remote
+        const { error: insErr } = await client.from('jarak').upsert({
+          id: local.id || undefined,
+          user_id: userId,
+          date: local.date || new Date().toISOString().split('T')[0],
+          total_km: Number(local.total_km || 0),
+          source: local.source || 'colota',
+          updated_at: local.updated_at || new Date().toISOString()
+        });
+        if (!insErr) {
+          local.user_id = userId;
+        }
+        mergedJarakMap.set(key, local);
+      } else {
+        const localTime = new Date(local.updated_at || 0).getTime();
+        const remoteTime = new Date(remote.updated_at || 0).getTime();
+        if (localTime > remoteTime) {
+          await client.from('jarak').update({
+            date: local.date,
+            total_km: Number(local.total_km || 0),
+            source: local.source || 'colota',
+            updated_at: local.updated_at || new Date().toISOString()
+          }).eq('id', local.id).eq('user_id', userId);
+          mergedJarakMap.set(key, local);
+        }
+      }
+    }
+
+    const mergedJarakList = Array.from(mergedJarakMap.values());
+    mergedJarakList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Copy/save hasil jarak (total_km) ke local DB (localStorage)
+    localStorage.setItem('oil_tracker_jarak', JSON.stringify(mergedJarakList));
+
     // Update settings in cloud if needed
     onSyncProgress('Sinkronisasi pengaturan...');
     const localSettings = localStorage.getItem('oil_tracker_settings');
@@ -442,6 +515,7 @@ export async function syncWithSupabase(
       syncedOilLogs: mergedOilLogs,
       syncedFuelLogs: mergedFuelLogs,
       syncedServiceLogs: mergedServiceLogs,
+      syncedJarakRecords: mergedJarakList,
       success: true,
       message: 'Sinkronisasi berhasil!'
     };
@@ -463,17 +537,30 @@ export async function syncWithSupabase(
 
 /**
  * Fetch all jarak records for the logged-in user (to sum by month in the UI).
+ * Copy/save the results to local DB (localStorage).
  */
 export async function fetchJarakRecords(): Promise<{
   records: Jarak[];
   error: string | null;
 }> {
   const client = getSupabaseClient();
-  if (!client) return { records: [], error: 'Supabase belum dikonfigurasi.' };
+  if (!client) {
+    const cached = localStorage.getItem('oil_tracker_jarak');
+    if (cached) {
+      try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
+    }
+    return { records: [], error: 'Supabase belum dikonfigurasi.' };
+  }
 
   try {
     const { data: { user }, error: authError } = await client.auth.getUser();
-    if (authError || !user) return { records: [], error: 'Silakan login terlebih dahulu.' };
+    if (authError || !user) {
+      const cached = localStorage.getItem('oil_tracker_jarak');
+      if (cached) {
+        try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
+      }
+      return { records: [], error: 'Silakan login terlebih dahulu.' };
+    }
 
     const { data, error } = await client
       .from('jarak')
@@ -481,9 +568,24 @@ export async function fetchJarakRecords(): Promise<{
       .eq('user_id', user.id)
       .order('date', { ascending: false });
 
-    if (error) return { records: [], error: `Gagal mengambil jarak tempuh: ${error.message}` };
-    return { records: (data || []) as Jarak[], error: null };
+    if (error) {
+      const cached = localStorage.getItem('oil_tracker_jarak');
+      if (cached) {
+        try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
+      }
+      return { records: [], error: `Gagal mengambil jarak tempuh: ${error.message}` };
+    }
+
+    const records = (data || []) as Jarak[];
+    // Copy/save hasil fungsi jarak (total_km) ke lokal DB (localStorage)
+    localStorage.setItem('oil_tracker_jarak', JSON.stringify(records));
+
+    return { records, error: null };
   } catch (err: any) {
+    const cached = localStorage.getItem('oil_tracker_jarak');
+    if (cached) {
+      try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
+    }
     return { records: [], error: err.message || 'Terjadi kesalahan.' };
   }
 }
