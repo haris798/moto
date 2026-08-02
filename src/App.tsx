@@ -417,7 +417,7 @@ export default function App() {
           <div className="p-6 border-b border-slate-150 dark:border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <img
-                src="/pwa_icon_192.jpg"
+                src="/pwa_icon_192.png"
                 alt="Logo MOTO"
                 referrerPolicy="no-referrer"
                 className="w-10 h-10 rounded-xl object-cover shadow-md shadow-indigo-600/15 border border-slate-200 dark:border-slate-700"
@@ -518,7 +518,7 @@ export default function App() {
           <div className="px-4 h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <img
-                src="/pwa_icon_192.jpg"
+                src="/pwa_icon_192.png"
                 alt="Logo MOTO"
                 referrerPolicy="no-referrer"
                 className="w-8 h-8 rounded-lg object-cover shadow-xs border border-slate-200 dark:border-slate-700"

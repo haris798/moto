@@ -55,6 +55,12 @@ jobs:
           rm -rf android
           npx cap add android
 
+      - name: Generate & Inject Android App Icons
+        run: |
+          npm install sharp --no-save
+          node scripts/generate-icons.js
+          node scripts/generate-android-icons.js
+
       - name: Sync Capacitor
         run: npx cap sync android
 
