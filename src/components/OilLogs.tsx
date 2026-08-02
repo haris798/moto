@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
 import { OilLog, AppSettings } from '../types';
 import { formatIDR } from '../utils/export';
 import {
@@ -107,6 +107,41 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
     return sortOrder === 'desc' ? tB - tA : tA - tB;
   });
   const uniqueBrands = ['All', ...Array.from(new Set(logs.map(l => l.oil_brand)))];
+
+  // Group logs by month
+  const groupedLogs = useMemo(() => {
+    const groups: { [key: string]: { label: string; logs: OilLog[]; totalCost: number } } = {};
+    const groupOrder: string[] = [];
+
+    for (const log of sortedLogs) {
+      let label = 'Lainnya';
+      let key = 'other';
+      if (log.date) {
+        const dateObj = new Date(log.date.includes('T') ? log.date : `${log.date}T00:00:00`);
+        if (!isNaN(dateObj.getTime())) {
+          const monthName = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+          label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+          const y = dateObj.getFullYear();
+          const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+          key = `${y}-${m}`;
+        }
+      }
+
+      if (!groups[key]) {
+        groups[key] = { label, logs: [], totalCost: 0 };
+        groupOrder.push(key);
+      }
+      groups[key].logs.push(log);
+      groups[key].totalCost += Number(log.cost || 0);
+    }
+
+    return groupOrder.map(k => ({
+      key: k,
+      label: groups[k].label,
+      logs: groups[k].logs,
+      totalCost: groups[k].totalCost,
+    }));
+  }, [sortedLogs]);
 
   // Stats
   const totalOilCost = logs.reduce((s, l) => s + l.cost, 0);
@@ -383,96 +418,125 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
             ))}
           </motion.div>
 
-          {/* Cards Grid */}
-          <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sortedLogs.map((log) => (
-              <motion.div
-                key={log.id}
-                variants={scaleIn}
-                whileHover={{ y: -3, transition: { duration: 0.2 } }}
-                id={`oil-card-${log.id}`}
-                className="group relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20 transition-all duration-300"
-              >
-                {/* Gradient accent bar */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-600 opacity-60" />
-
-                <div className="p-5">
-                  {/* Top Row */}
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 transition-transform duration-300 group-hover:scale-110">
-                        <Calendar className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-[11px] font-medium text-slate-400">
-                          {new Date(log.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                        </span>
-                        <h4 className="font-bold text-slate-800 dark:text-white mt-0.5 text-base">
-                          {log.oil_brand}
-                        </h4>
-                        <span className="text-[11px] text-slate-400">{log.oil_type}</span>
-                      </div>
+          {/* Cards Grouped by Month */}
+          <div className="space-y-6">
+            {groupedLogs.map((group) => (
+              <div key={group.key} className="space-y-3">
+                {/* Month Section Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                      <Calendar className="w-3.5 h-3.5" />
                     </div>
-
-                    <div className="flex gap-1 items-center">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        id={`btn-edit-oil-${log.id}`}
-                        onClick={() => handleOpenEdit(log)}
-                        title="Edit Catatan"
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition-all cursor-pointer"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        id={`btn-delete-oil-${log.id}`}
-                        onClick={() => {
-                          if (confirm('Apakah Anda yakin ingin menghapus catatan ganti oli ini?')) onDeleteLog(log.id);
-                        }}
-                        title="Hapus Catatan"
-                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
-                    </div>
+                    <h3 className="font-extrabold text-slate-800 dark:text-white text-xs md:text-sm tracking-wide">
+                      {group.label}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40">
+                      {group.logs.length} Entri
+                    </span>
                   </div>
 
-                  {/* Metrics */}
-                  <div className="grid grid-cols-3 gap-3 mt-4 py-3 border-y border-slate-50 dark:border-slate-800/40">
-                    <div className="text-center">
-                      <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Jarak Tempuh</span>
-                      <div className="flex items-baseline justify-center gap-0.5">
-                        <span className="text-sm font-extrabold text-slate-800 dark:text-white">{log.mileage.toLocaleString('id-ID')}</span>
-                        <span className="text-[10px] text-slate-400">km</span>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Biaya</span>
-                      <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">{formatIDR(log.cost)}</span>
-                    </div>
-                    <div className="text-center">
-                      <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Performa</span>
-                      <span className="flex items-center justify-center gap-0.5 text-amber-500 font-bold text-sm mt-0.5">
-                        {log.rating || 5} <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                      </span>
-                    </div>
+                  <div className="text-right flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+                    <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">Subtotal:</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">
+                      {formatIDR(group.totalCost)}
+                    </span>
                   </div>
-
-                  {/* Notes */}
-                  {log.notes && (
-                    <div className="mt-3 bg-slate-50/50 dark:bg-slate-950/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/40 text-[12px] text-slate-500 italic flex items-start gap-1.5">
-                      <span className="text-slate-300 dark:text-slate-600 leading-none">&ldquo;</span>
-                      <span>{log.notes}</span>
-                      <span className="text-slate-300 dark:text-slate-600 leading-none">&rdquo;</span>
-                    </div>
-                  )}
                 </div>
-              </motion.div>
+
+                {/* Cards Grid for this Month */}
+                <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {group.logs.map((log) => (
+                    <motion.div
+                      key={log.id}
+                      variants={scaleIn}
+                      whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                      id={`oil-card-${log.id}`}
+                      className="group relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20 transition-all duration-300"
+                    >
+                      {/* Gradient accent bar */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-600 opacity-60" />
+
+                      <div className="p-5">
+                        {/* Top Row */}
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 transition-transform duration-300 group-hover:scale-110">
+                              <Calendar className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-medium text-slate-400">
+                                {new Date(log.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                              </span>
+                              <h4 className="font-bold text-slate-800 dark:text-white mt-0.5 text-base">
+                                {log.oil_brand}
+                              </h4>
+                              <span className="text-[11px] text-slate-400">{log.oil_type}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1 items-center">
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              id={`btn-edit-oil-${log.id}`}
+                              onClick={() => handleOpenEdit(log)}
+                              title="Edit Catatan"
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              id={`btn-delete-oil-${log.id}`}
+                              onClick={() => {
+                                if (confirm('Apakah Anda yakin ingin menghapus catatan ganti oli ini?')) onDeleteLog(log.id);
+                              }}
+                              title="Hapus Catatan"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </motion.button>
+                          </div>
+                        </div>
+
+                        {/* Metrics */}
+                        <div className="grid grid-cols-3 gap-3 mt-4 py-3 border-y border-slate-50 dark:border-slate-800/40">
+                          <div className="text-center">
+                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Jarak Tempuh</span>
+                            <div className="flex items-baseline justify-center gap-0.5">
+                              <span className="text-sm font-extrabold text-slate-800 dark:text-white">{log.mileage.toLocaleString('id-ID')}</span>
+                              <span className="text-[10px] text-slate-400">km</span>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Biaya</span>
+                            <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">{formatIDR(log.cost)}</span>
+                          </div>
+                          <div className="text-center">
+                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Performa</span>
+                            <span className="flex items-center justify-center gap-0.5 text-amber-500 font-bold text-sm mt-0.5">
+                              {log.rating || 5} <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        {log.notes && (
+                          <div className="mt-3 bg-slate-50/50 dark:bg-slate-950/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/40 text-[12px] text-slate-500 italic flex items-start gap-1.5">
+                            <span className="text-slate-300 dark:text-slate-600 leading-none">&ldquo;</span>
+                            <span>{log.notes}</span>
+                            <span className="text-slate-300 dark:text-slate-600 leading-none">&rdquo;</span>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         </>
       )}
     </motion.div>

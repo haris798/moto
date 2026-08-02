@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
 import { ServiceLog, AppSettings } from '../types';
 import { formatIDR } from '../utils/export';
 import {
@@ -198,6 +198,41 @@ export default function ServiceLogs({
     return sortOrder === 'desc' ? tB - tA : tA - tB;
   });
 
+  // Group logs by month
+  const groupedLogs = useMemo(() => {
+    const groups: { [key: string]: { label: string; logs: ServiceLog[]; totalCost: number } } = {};
+    const groupOrder: string[] = [];
+
+    for (const log of sortedLogs) {
+      let label = 'Lainnya';
+      let key = 'other';
+      if (log.date) {
+        const dateObj = new Date(log.date.includes('T') ? log.date : `${log.date}T00:00:00`);
+        if (!isNaN(dateObj.getTime())) {
+          const monthName = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+          label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+          const y = dateObj.getFullYear();
+          const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+          key = `${y}-${m}`;
+        }
+      }
+
+      if (!groups[key]) {
+        groups[key] = { label, logs: [], totalCost: 0 };
+        groupOrder.push(key);
+      }
+      groups[key].logs.push(log);
+      groups[key].totalCost += Number(log.cost || 0);
+    }
+
+    return groupOrder.map(k => ({
+      key: k,
+      label: groups[k].label,
+      logs: groups[k].logs,
+      totalCost: groups[k].totalCost,
+    }));
+  }, [sortedLogs]);
+
   // Calculate Statistics
   const totalServiceCost = logs.reduce((acc, l) => acc + (l.cost || 0), 0);
   const totalServiceCount = logs.length;
@@ -326,85 +361,114 @@ export default function ServiceLogs({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {sortedLogs.map((log) => (
-              <motion.div
-                key={log.id}
-                variants={scaleIn}
-                className="group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-4 shadow-xs hover:shadow-md transition-all space-y-3"
-              >
-                {/* Card Header: Category & Date */}
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40">
-                        {log.service_type || 'Servis Motor'}
-                      </span>
+          <div className="space-y-6">
+            {groupedLogs.map((group) => (
+              <div key={group.key} className="space-y-3">
+                {/* Month Section Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                      <Calendar className="w-3.5 h-3.5" />
                     </div>
-                    <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base mt-1.5 leading-snug">
-                      {log.description}
+                    <h3 className="font-extrabold text-slate-800 dark:text-white text-xs md:text-sm tracking-wide">
+                      {group.label}
                     </h3>
-                  </div>
-
-                  {/* Actions: Edit & Delete */}
-                  <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleOpenEdit(log)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                      title="Edit Log Servis"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setDeletingId(log.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                      title="Hapus Log Servis"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Spare Part Tags */}
-                {log.parts_changed && log.parts_changed.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {log.parts_changed.map((part, pIdx) => (
-                      <span
-                        key={pIdx}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60"
-                      >
-                        <Tag className="w-2.5 h-2.5 text-amber-500" />
-                        {part}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Notes if available */}
-                {log.notes && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 italic">
-                    "{log.notes}"
-                  </p>
-                )}
-
-                {/* Card Footer: Mileage & Cost */}
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 font-medium">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      {new Date(log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Gauge className="w-3.5 h-3.5 text-slate-400" />
-                      {log.mileage.toLocaleString('id-ID')} km
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/40">
+                      {group.logs.length} Servis
                     </span>
                   </div>
 
-                  <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
-                    {formatIDR(log.cost)}
-                  </span>
+                  <div className="text-right flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+                    <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">Subtotal:</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-extrabold">
+                      {formatIDR(group.totalCost)}
+                    </span>
+                  </div>
                 </div>
-              </motion.div>
+
+                {/* Grid for this Month */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {group.logs.map((log) => (
+                    <motion.div
+                      key={log.id}
+                      variants={scaleIn}
+                      className="group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-4 shadow-xs hover:shadow-md transition-all space-y-3"
+                    >
+                      {/* Card Header: Category & Date */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40">
+                              {log.service_type || 'Servis Motor'}
+                            </span>
+                          </div>
+                          <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base mt-1.5 leading-snug">
+                            {log.description}
+                          </h3>
+                        </div>
+
+                        {/* Actions: Edit & Delete */}
+                        <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleOpenEdit(log)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                            title="Edit Log Servis"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingId(log.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                            title="Hapus Log Servis"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Spare Part Tags */}
+                      {log.parts_changed && log.parts_changed.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {log.parts_changed.map((part, pIdx) => (
+                            <span
+                              key={pIdx}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60"
+                            >
+                              <Tag className="w-2.5 h-2.5 text-amber-500" />
+                              {part}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Notes if available */}
+                      {log.notes && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 italic">
+                          "{log.notes}"
+                        </p>
+                      )}
+
+                      {/* Card Footer: Mileage & Cost */}
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 font-medium">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            {new Date(log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Gauge className="w-3.5 h-3.5 text-slate-400" />
+                            {log.mileage.toLocaleString('id-ID')} km
+                          </span>
+                        </div>
+
+                        <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
+                          {formatIDR(log.cost)}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

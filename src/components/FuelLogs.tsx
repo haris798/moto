@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
 import { FuelLog, AppSettings } from '../types';
 import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
@@ -212,6 +212,43 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
     return sortOrder === 'desc' ? tB - tA : tA - tB;
   });
   const uniqueFuelTypes = ['All', ...Array.from(new Set(logs.map(l => l.fuel_type)))];
+
+  // Group logs by month
+  const groupedLogs = useMemo(() => {
+    const groups: { [key: string]: { label: string; logs: FuelLog[]; totalCost: number; totalLiters: number } } = {};
+    const groupOrder: string[] = [];
+
+    for (const log of sortedLogs) {
+      let label = 'Lainnya';
+      let key = 'other';
+      if (log.date) {
+        const dateObj = new Date(log.date.includes('T') ? log.date : `${log.date}T00:00:00`);
+        if (!isNaN(dateObj.getTime())) {
+          const monthName = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+          label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+          const y = dateObj.getFullYear();
+          const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+          key = `${y}-${m}`;
+        }
+      }
+
+      if (!groups[key]) {
+        groups[key] = { label, logs: [], totalCost: 0, totalLiters: 0 };
+        groupOrder.push(key);
+      }
+      groups[key].logs.push(log);
+      groups[key].totalCost += Number(log.cost || 0);
+      groups[key].totalLiters += Number(log.liters || 0);
+    }
+
+    return groupOrder.map(k => ({
+      key: k,
+      label: groups[k].label,
+      logs: groups[k].logs,
+      totalCost: groups[k].totalCost,
+      totalLiters: groups[k].totalLiters,
+    }));
+  }, [sortedLogs]);
 
   // Stats
   const totalFuelCost = logs.reduce((s, l) => s + l.cost, 0);
@@ -588,105 +625,134 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
             ))}
           </motion.div>
 
-          {/* Cards Grid */}
-          <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sortedLogs.map((log, index) => (
-              <motion.div
-                key={log.id}
-                variants={scaleIn}
-                whileHover={{ y: -3, transition: { duration: 0.2 } }}
-                id={`fuel-card-${log.id}`}
-                className="group relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20 transition-all duration-300"
-              >
-                {/* Gradient accent bar */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-60" />
-
-                <div className="p-5">
-                  {/* Top Row */}
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 transition-transform duration-300 group-hover:scale-110">
-                        <Calendar className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-[11px] font-medium text-slate-400">
-                          {new Date(log.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                        </span>
-                        <h4 className="font-bold text-slate-800 dark:text-white mt-0.5 text-base">
-                          {log.fuel_type}
-                        </h4>
-                      </div>
+          {/* Cards Grouped by Month */}
+          <div className="space-y-6">
+            {groupedLogs.map((group) => (
+              <div key={group.key} className="space-y-3">
+                {/* Month Section Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                      <Calendar className="w-3.5 h-3.5" />
                     </div>
-
-                    <div className="flex gap-1 items-center">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        id={`btn-edit-fuel-${log.id}`}
-                        onClick={() => handleOpenEdit(log)}
-                        title="Edit Catatan"
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all cursor-pointer"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        id={`btn-delete-fuel-${log.id}`}
-                        onClick={() => {
-                          if (confirm('Apakah Anda yakin ingin menghapus catatan BBM ini?')) onDeleteLog(log.id);
-                        }}
-                        title="Hapus Catatan"
-                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
-                    </div>
+                    <h3 className="font-extrabold text-slate-800 dark:text-white text-xs md:text-sm tracking-wide">
+                      {group.label}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40">
+                      {group.logs.length} Entri
+                    </span>
                   </div>
 
-                  {/* Metrics */}
-                  <div className="grid grid-cols-3 gap-3 mt-4 py-3 border-y border-slate-50 dark:border-slate-800/40">
-                    <div className="text-center">
-                      <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Volume</span>
-                      <div className="flex items-baseline justify-center gap-0.5">
-                        <span className="text-sm font-extrabold text-slate-800 dark:text-white">{log.liters.toLocaleString('id-ID')}</span>
-                        <span className="text-[10px] text-slate-400">L</span>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Jarak Tempuh</span>
-                      <div className="flex items-baseline justify-center gap-0.5">
-                        <span className="text-sm font-extrabold text-slate-800 dark:text-white">
-                          {log.efficiency && log.liters > 0
-                            ? Math.round(log.efficiency * log.liters).toLocaleString('id-ID')
-                            : log.mileage > 0
-                            ? log.mileage.toLocaleString('id-ID')
-                            : '-'}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {(log.efficiency && log.liters > 0) || log.mileage > 0 ? 'km' : ''}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Biaya</span>
-                      <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{formatIDR(log.cost)}</span>
-                    </div>
-                  </div>
-
-                  {/* Bottom Row */}
-                  <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-                    {getEfficiencyBadge(log.efficiency)}
-                    {log.notes && (
-                      <span className="text-[11px] text-slate-400 max-w-[50%] truncate italic" title={log.notes}>
-                        &ldquo;{log.notes}&rdquo;
-                      </span>
-                    )}
+                  <div className="text-right flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                    <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">{group.totalLiters.toFixed(1)} L • Subtotal:</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">
+                      {formatIDR(group.totalCost)}
+                    </span>
                   </div>
                 </div>
-              </motion.div>
+
+                {/* Cards Grid for this Month */}
+                <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {group.logs.map((log) => (
+                    <motion.div
+                      key={log.id}
+                      variants={scaleIn}
+                      whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                      id={`fuel-card-${log.id}`}
+                      className="group relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20 transition-all duration-300"
+                    >
+                      {/* Gradient accent bar */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-60" />
+
+                      <div className="p-5">
+                        {/* Top Row */}
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 transition-transform duration-300 group-hover:scale-110">
+                              <Calendar className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-medium text-slate-400">
+                                {new Date(log.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                              </span>
+                              <h4 className="font-bold text-slate-800 dark:text-white mt-0.5 text-base">
+                                {log.fuel_type}
+                              </h4>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1 items-center">
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              id={`btn-edit-fuel-${log.id}`}
+                              onClick={() => handleOpenEdit(log)}
+                              title="Edit Catatan"
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              id={`btn-delete-fuel-${log.id}`}
+                              onClick={() => {
+                                if (confirm('Apakah Anda yakin ingin menghapus catatan BBM ini?')) onDeleteLog(log.id);
+                              }}
+                              title="Hapus Catatan"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </motion.button>
+                          </div>
+                        </div>
+
+                        {/* Metrics */}
+                        <div className="grid grid-cols-3 gap-3 mt-4 py-3 border-y border-slate-50 dark:border-slate-800/40">
+                          <div className="text-center">
+                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Volume</span>
+                            <div className="flex items-baseline justify-center gap-0.5">
+                              <span className="text-sm font-extrabold text-slate-800 dark:text-white">{log.liters.toLocaleString('id-ID')}</span>
+                              <span className="text-[10px] text-slate-400">L</span>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Jarak Tempuh</span>
+                            <div className="flex items-baseline justify-center gap-0.5">
+                              <span className="text-sm font-extrabold text-slate-800 dark:text-white">
+                                {log.efficiency && log.liters > 0
+                                  ? Math.round(log.efficiency * log.liters).toLocaleString('id-ID')
+                                  : log.mileage > 0
+                                  ? log.mileage.toLocaleString('id-ID')
+                                  : '-'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {(log.efficiency && log.liters > 0) || log.mileage > 0 ? 'km' : ''}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Biaya</span>
+                            <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{formatIDR(log.cost)}</span>
+                          </div>
+                        </div>
+
+                        {/* Bottom Row */}
+                        <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+                          {getEfficiencyBadge(log.efficiency)}
+                          {log.notes && (
+                            <span className="text-[11px] text-slate-400 max-w-[50%] truncate italic" title={log.notes}>
+                              &ldquo;{log.notes}&rdquo;
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         </>
       )}
     </motion.div>
