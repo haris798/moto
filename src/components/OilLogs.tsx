@@ -1,6 +1,7 @@
-import { useState, useMemo, type FormEvent } from 'react';
-import { OilLog, AppSettings } from '../types';
+import { useState, useMemo, useEffect, type FormEvent } from 'react';
+import { OilLog, AppSettings, Jarak } from '../types';
 import { formatIDR } from '../utils/export';
+import { fetchJarakRecords } from '../lib/supabaseClient';
 import {
   Plus, Trash2, Edit3, Calendar, Search, Wrench, Star, X, ArrowUpDown, AlertCircle,
   Droplets, Gauge, DollarSign, Clock, ListFilter, Shield, Award
@@ -143,10 +144,46 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
     }));
   }, [sortedLogs]);
 
+  // Jarak tempuh records from local DB & Supabase
+  const [jarakRecords, setJarakRecords] = useState<Jarak[]>(() => {
+    try {
+      const cached = localStorage.getItem('oil_tracker_jarak');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    fetchJarakRecords().then(({ records }) => {
+      if (records && records.length > 0) {
+        setJarakRecords(records);
+      }
+    });
+  }, []);
+
   // Stats
   const totalOilCost = logs.reduce((s, l) => s + l.cost, 0);
-  const lastOilLog = logs.length > 0 ? logs[0] : null;
-  const maxOilMileage = logs.length > 0 ? Math.max(...logs.map(l => l.mileage)) : 0;
+
+  // Total jarak sejak ganti oli terakhir (atau total jarak tempuh jika belum pernah ganti oli)
+  const distanceSinceLastOil = useMemo(() => {
+    if (logs.length === 0) {
+      return jarakRecords.reduce((sum, r) => sum + Number(r.total_km || 0), 0);
+    }
+
+    const sortedByDate = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const latestOil = sortedByDate[0];
+    const latestOilDateStr = latestOil.date.includes('T') ? latestOil.date.split('T')[0] : latestOil.date;
+
+    const sumJarak = jarakRecords
+      .filter(r => {
+        const rDateStr = r.date.includes('T') ? r.date.split('T')[0] : r.date;
+        return rDateStr >= latestOilDateStr;
+      })
+      .reduce((sum, r) => sum + Number(r.total_km || 0), 0);
+
+    return sumJarak;
+  }, [logs, jarakRecords]);
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5 md:space-y-6 px-0 md:px-1">
@@ -190,7 +227,7 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
               { icon: Droplets, label: 'Total Servis', value: `${logs.length}x ganti` },
               { icon: DollarSign, label: 'Total Biaya', value: formatIDR(totalOilCost) },
               { icon: Shield, label: 'Merek Populer', value: uniqueBrands.filter(b => b !== 'All').length > 0 ? uniqueBrands.filter(b => b !== 'All')[0] : '-' },
-              { icon: Gauge, label: 'Jarak Terakhir', value: maxOilMileage > 0 ? `${maxOilMileage.toLocaleString('id-ID')} km` : '-' },
+              { icon: Gauge, label: 'Jarak Terakhir', value: `${distanceSinceLastOil.toLocaleString('id-ID')} km` },
             ].map((item, i) => (
               <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                 <div className="flex items-center gap-2 text-indigo-200/70 text-[11px] font-medium tracking-wider mb-1">
@@ -397,7 +434,7 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
           <motion.div variants={fadeUp} className="grid grid-cols-3 gap-3">
             {[
               { icon: DollarSign, label: 'Total Biaya Oli', value: formatIDR(totalOilCost), color: 'indigo' },
-              { icon: Gauge, label: 'Jarak Terakhir', value: maxOilMileage > 0 ? `${maxOilMileage.toLocaleString('id-ID')} km` : '-', color: 'violet' },
+              { icon: Gauge, label: 'Jarak Terakhir', value: `${distanceSinceLastOil.toLocaleString('id-ID')} km`, color: 'violet' },
               { icon: Award, label: 'Total Servis', value: `${logs.length}x`, color: 'indigo' },
             ].map((stat, i) => (
               <motion.div

@@ -261,6 +261,35 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const currentYear = now.getFullYear();
   const currentMonthName = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
+  // ── Ringkasan Kesehatan Motor Cepat ──────────────────────────────────────────
+  const serviceLogsThisMonth = serviceLogs.filter(l => {
+    const d = new Date(l.date);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+  const thisMonthServiceCost = serviceLogsThisMonth.reduce((sum, l) => sum + l.cost, 0);
+  const thisMonthServiceCount = serviceLogsThisMonth.length;
+
+  const distanceSinceLastOil = (() => {
+    if (oilLogs.length === 0) {
+      return jarakData.reduce((sum, r) => sum + Number(r.total_km || 0), 0);
+    }
+
+    const sortedOil = [...oilLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const latestOil = sortedOil[0];
+    const latestOilDateStr = latestOil.date.includes('T') ? latestOil.date.split('T')[0] : latestOil.date;
+
+    const sumJarak = jarakData
+      .filter(r => {
+        const rDateStr = r.date.includes('T') ? r.date.split('T')[0] : r.date;
+        return rDateStr >= latestOilDateStr;
+      })
+      .reduce((sum, r) => sum + Number(r.total_km || 0), 0);
+
+    const mileageDiff = Math.max(0, currentMileage - latestOil.mileage);
+
+    return Math.max(mileageDiff, sumJarak);
+  })();
+
   const getDateRangeBounds = () => {
     let start: Date | null = null;
     let end: Date | null = new Date();
@@ -445,6 +474,68 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             ))}
           </div>
         </div>
+      </motion.div>
+
+      {/* ═══════════════════════ 1.5 KARTU RINGKASAN KESEHATAN MOTOR ═══════════════════════ */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 md:gap-4">
+        {/* Card 1: Total Biaya Servis Bulan Ini */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          onClick={() => onNavigate('service')}
+          className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 md:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-indigo-600" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                <Wrench className="w-3.5 h-3.5 text-indigo-500" />
+                Total Biaya Servis Bulan Ini
+              </span>
+              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display">
+                {formatIDR(thisMonthServiceCost)}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <CalendarDays className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span>{thisMonthServiceCount > 0 ? `${thisMonthServiceCount}x servis di ${currentMonthName}` : `Belum ada servis di ${currentMonthName}`}</span>
+              </p>
+            </div>
+            <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shrink-0 group-hover:scale-110 transition-transform">
+              <Coins className="w-6 h-6" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Card 2: Jarak Tempuh Total Sejak Ganti Oli */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          onClick={() => onNavigate('oil')}
+          className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 md:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5 text-emerald-500" />
+                Jarak Tempuh Sejak Ganti Oli
+              </span>
+              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display">
+                {distanceSinceLastOil.toLocaleString('id-ID')} <span className="text-sm font-normal text-slate-500">km</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <Droplets className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>
+                  {lastOilLog
+                    ? `Terakhir ganti oli: ${new Date(lastOilLog.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                    : 'Belum ada riwayat ganti oli'
+                  }
+                </span>
+              </p>
+            </div>
+            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40 shrink-0 group-hover:scale-110 transition-transform">
+              <Activity className="w-6 h-6" />
+            </div>
+          </div>
+        </motion.div>
       </motion.div>
 
       {/* ═══════════════════════ 2. ALERT BANNER ═══════════════════════ */}
