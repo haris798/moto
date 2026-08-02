@@ -73,7 +73,6 @@ export default function ServiceLogs({
 
   // Form Fields
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [mileage, setMileage] = useState<number | ''>('');
   const [cost, setCost] = useState<number | ''>('');
   const [serviceType, setServiceType] = useState('Servis Rutin');
   const [description, setDescription] = useState('');
@@ -92,9 +91,6 @@ export default function ServiceLogs({
 
   const resetForm = () => {
     setDate(new Date().toISOString().split('T')[0]);
-    // Default mileage to latest log or 0
-    const latestKm = logs.length > 0 ? Math.max(...logs.map(l => l.mileage)) : 0;
-    setMileage(latestKm > 0 ? latestKm : '');
     setCost('');
     setServiceType('Servis Rutin');
     setDescription('');
@@ -113,7 +109,6 @@ export default function ServiceLogs({
   const handleOpenEdit = (log: ServiceLog) => {
     setEditingId(log.id);
     setDate(log.date);
-    setMileage(log.mileage);
     setCost(log.cost);
     setServiceType(log.service_type || 'Servis Rutin');
     setDescription(log.description || '');
@@ -143,7 +138,6 @@ export default function ServiceLogs({
     e.preventDefault();
     setFormError(null);
 
-    const mileageNum = Number(mileage);
     const costNum = Number(cost);
 
     if (cost === '' || isNaN(costNum) || costNum < 0) {
@@ -151,17 +145,15 @@ export default function ServiceLogs({
       return;
     }
 
-    if (mileage === '' || isNaN(mileageNum) || mileageNum < 0) {
-      setFormError('Kilometer odometer harus berupa angka positif.');
-      return;
-    }
-
     // Thousands shortcut support (e.g. 150 -> 150,000 IDR)
     const actualCost = (costNum > 0 && costNum < 1000) ? costNum * 1000 : costNum;
 
+    const existingLog = editingId ? logs.find(l => l.id === editingId) : null;
+    const mileageVal = existingLog ? existingLog.mileage : 0;
+
     const logData: Omit<ServiceLog, 'id'> = {
       date,
-      mileage: Math.round(mileageNum),
+      mileage: mileageVal,
       cost: actualCost,
       service_type: serviceType,
       description: description.trim() || serviceType,
@@ -283,7 +275,7 @@ export default function ServiceLogs({
               { icon: Wrench, label: 'Total Servis', value: `${totalServiceCount}x Pengerjaan` },
               { icon: DollarSign, label: 'Total Biaya Servis', value: formatIDR(totalServiceCost) },
               { icon: Package, label: 'Spare Part Diganti', value: `${allPartsChanged.length} Jenis` },
-              { icon: Gauge, label: 'Servis Terakhir', value: latestService ? `${latestService.mileage.toLocaleString('id-ID')} km` : '-' },
+              { icon: Calendar, label: 'Servis Terakhir', value: latestService ? new Date(latestService.date.includes('T') ? latestService.date : `${latestService.date}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-' },
             ].map((item, i) => (
               <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                 <div className="flex items-center gap-2 text-amber-100/70 text-[11px] font-medium tracking-wider mb-1">
@@ -448,16 +440,12 @@ export default function ServiceLogs({
                         </p>
                       )}
 
-                      {/* Card Footer: Mileage & Cost */}
+                      {/* Card Footer: Date & Cost */}
                       <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 font-medium">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
                             {new Date(log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Gauge className="w-3.5 h-3.5 text-slate-400" />
-                            {log.mileage.toLocaleString('id-ID')} km
                           </span>
                         </div>
 
@@ -530,35 +518,18 @@ export default function ServiceLogs({
                   </select>
                 </div>
 
-                {/* Tanggal & Odometer */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-amber-500" /> Tanggal
-                    </label>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <Gauge className="w-3.5 h-3.5 text-amber-500" /> Odometer (km)
-                    </label>
-                    <input
-                      type="number"
-                      value={mileage}
-                      onChange={(e) => setMileage(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="e.g. 18500"
-                      required
-                      min="0"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
-                    />
-                  </div>
+                {/* Tanggal */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-amber-500" /> Tanggal Servis
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden font-medium"
+                  />
                 </div>
 
                 {/* Deskripsi Singkat */}

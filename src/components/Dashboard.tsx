@@ -253,7 +253,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   // Fitur ini memungkinkan pengguna untuk memfilter data biaya, oli, dan jarak tempuh 
   // berdasarkan rentang waktu tertentu, memberikan fleksibilitas analisis yang lebih baik.
   type TimeFilterMode = '7d' | 'month' | '30d' | '3m' | 'year' | 'all' | 'custom';
-  const [timeFilterMode, setTimeFilterMode] = useState<TimeFilterMode>('month');
+  const [timeFilterMode, setTimeFilterMode] = useState<TimeFilterMode>('30d');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
 
@@ -261,13 +261,14 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const currentYear = now.getFullYear();
   const currentMonthName = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
-  // ── Ringkasan Kesehatan Motor Cepat ──────────────────────────────────────────
-  const serviceLogsThisMonth = serviceLogs.filter(l => {
-    const d = new Date(l.date);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  });
-  const thisMonthServiceCost = serviceLogsThisMonth.reduce((sum, l) => sum + l.cost, 0);
-  const thisMonthServiceCount = serviceLogsThisMonth.length;
+  // ── Ringkasan Kesehatan Motor Cepat (30 Hari Terakhir) ────────────────────────
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+  const serviceLogs30Days = serviceLogs.filter(l => new Date(l.date) >= thirtyDaysAgo);
+  const serviceCost30Days = serviceLogs30Days.reduce((sum, l) => sum + l.cost, 0);
+  const serviceCount30Days = serviceLogs30Days.length;
 
   const distanceSinceLastOil = (() => {
     if (oilLogs.length === 0) {
@@ -421,9 +422,6 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
                     Dashboard Motor
                   </h1>
-                  <p className="text-indigo-200/80 dark:text-slate-400 text-sm mt-0.5">
-                    Pantau efisiensi dan biaya perawatan motor Anda
-                  </p>
                 </div>
               </div>
             </div>
@@ -432,18 +430,18 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => onNavigate('oil')}
-                className="px-3.5 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg"
-              >
-                <Droplets className="w-4 h-4" /> Oli
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
                 onClick={() => onNavigate('fuel')}
                 className="px-3.5 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg"
               >
                 <Fuel className="w-4 h-4" /> BBM
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => onNavigate('oil')}
+                className="px-3.5 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg"
+              >
+                <Droplets className="w-4 h-4" /> Oli
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.03 }}
@@ -478,7 +476,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
 
       {/* ═══════════════════════ 1.5 KARTU RINGKASAN KESEHATAN MOTOR ═══════════════════════ */}
       <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 md:gap-4">
-        {/* Card 1: Total Biaya Servis Bulan Ini */}
+        {/* Card 1: Total Biaya Servis 30 Hari Terakhir */}
         <motion.div
           whileHover={{ y: -2 }}
           onClick={() => onNavigate('service')}
@@ -489,14 +487,14 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                 <Wrench className="w-3.5 h-3.5 text-indigo-500" />
-                Total Biaya Servis Bulan Ini
+                Total Biaya Servis (30 Hari Terakhir)
               </span>
               <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display">
-                {formatIDR(thisMonthServiceCost)}
+                {formatIDR(serviceCost30Days)}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                 <CalendarDays className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>{thisMonthServiceCount > 0 ? `${thisMonthServiceCount}x servis di ${currentMonthName}` : `Belum ada servis di ${currentMonthName}`}</span>
+                <span>{serviceCount30Days > 0 ? `${serviceCount30Days}x servis dalam 30 hari terakhir` : 'Belum ada servis dalam 30 hari terakhir'}</span>
               </p>
             </div>
             <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shrink-0 group-hover:scale-110 transition-transform">

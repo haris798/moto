@@ -56,8 +56,8 @@ export default function App() {
 
   const tabsList = [
     { id: 'dashboard', label: 'Dashboard', icon: Gauge },
-    { id: 'oil', label: 'Oli', icon: Droplets },
     { id: 'fuel', label: 'BBM', icon: Fuel },
+    { id: 'oil', label: 'Oli', icon: Droplets },
     { id: 'service', label: 'Servis', icon: Wrench },
     { id: 'settings', label: 'Pengaturan', icon: Settings },
   ];
