@@ -416,9 +416,12 @@ export default function App() {
           {/* Logo & Header */}
           <div className="p-6 border-b border-slate-150 dark:border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/25 flex items-center justify-center">
-                <Gauge className="w-5 h-5" />
-              </span>
+              <img
+                src="/pwa_icon_192.jpg"
+                alt="Logo MOTO"
+                referrerPolicy="no-referrer"
+                className="w-10 h-10 rounded-xl object-cover shadow-md shadow-indigo-600/15 border border-slate-200 dark:border-slate-700"
+              />
               <div>
                 <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white leading-none font-display">
                   MOTO-LOG
@@ -514,14 +517,17 @@ export default function App() {
         <header className="sticky top-0 z-45 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800/80 transition-colors md:hidden shrink-0 pt-[env(safe-area-inset-top)]">
           <div className="px-4 h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 bg-indigo-600 rounded-xl text-white shadow-md">
-                <Gauge className="w-4 h-4" />
-              </span>
+              <img
+                src="/pwa_icon_192.jpg"
+                alt="Logo MOTO"
+                referrerPolicy="no-referrer"
+                className="w-8 h-8 rounded-lg object-cover shadow-xs border border-slate-200 dark:border-slate-700"
+              />
               <div>
                 <h1 className="text-sm font-black tracking-tight text-slate-900 dark:text-white font-display leading-none">
                   Motor.ku
                 </h1>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">Jurnal BBM</span>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">Jurnal BBM & Oli</span>
               </div>
             </div>
 

@@ -1,13 +1,38 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Motor.ku App</title>
+    <title>Motor.ku - Jurnal Oli & BBM</title>
+
+    <!-- PWA Meta Tags & Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="Aplikasi pelacak servis oli, bahan bakar (BBM), dan efisiensi sepeda motor dengan sinkronisasi cloud." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Motor.ku" />
+    <link rel="apple-touch-icon" href="/pwa_icon_192.jpg" />
+    <link rel="icon" type="image/jpeg" href="/pwa_icon_192.jpg" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+              console.log('Service Worker terdaftar secara sukses dengan scope:', reg.scope);
+            })
+            .catch((err) => {
+              console.error('Gagal mendaftarkan Service Worker:', err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
 

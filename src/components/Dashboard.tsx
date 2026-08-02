@@ -4,13 +4,14 @@ import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  LineChart, Line
+  LineChart, Line, AreaChart, Area, ComposedChart
 } from 'recharts';
 import {
   Gauge, Droplets, Fuel, AlertTriangle, CheckCircle2, TrendingUp, Coins, Activity,
   RefreshCw, Timer, Zap, Flame,
   Battery, Wrench, Clock, Target, Milestone, Satellite, Calendar,
-  Filter, CalendarDays, SlidersHorizontal, ChevronDown, RotateCcw
+  Filter, CalendarDays, SlidersHorizontal, ChevronDown, RotateCcw, Compass, Sparkles,
+  ArrowDownRight, ArrowUpRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -156,16 +157,36 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
   });
   const sortedMonthlyData = Array.from(monthlyDataMap.values());
 
-  // Efficiency trend
+  // Mode Tampilan Grafik Efisiensi BBM
+  type FuelMetricMode = 'km_l' | 'l_100km' | 'cost_km';
+  const [fuelMetricMode, setFuelMetricMode] = useState<FuelMetricMode>('km_l');
+
+  // Comprehensive Efficiency & Consumption trend per kilometer
   const efficiencyTrendData = [...fuelLogs]
     .filter(l => l.efficiency && l.efficiency > 0)
-    .reverse()
-    .slice(-10)
-    .map(log => ({
-      date: new Date(log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
-      'Efisiensi (km/L)': Number(log.efficiency?.toFixed(1)) || 0,
-      'Rata-rata': Number(avgEfficiency.toFixed(1))
-    }));
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(-12)
+    .map(log => {
+      const kmL = Number(log.efficiency?.toFixed(1)) || 0;
+      const l100 = kmL > 0 ? Number((100 / kmL).toFixed(2)) : 0;
+      const pricePerLiter = log.cost && log.liters && log.liters > 0 ? log.cost / log.liters : settings.fuelPricePerLiter || 10000;
+      const costPerKm = kmL > 0 ? Math.round(pricePerLiter / kmL) : 0;
+
+      return {
+        date: new Date(log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+        fullDate: log.date,
+        fuelType: log.fuel_type || 'BBM',
+        mileage: log.mileage,
+        liters: log.liters,
+        cost: log.cost,
+        'Efisiensi (km/L)': kmL,
+        'Konsumsi (L/100km)': l100,
+        'Biaya/km (Rp)': costPerKm,
+        'Rata-rata km/L': Number(avgEfficiency.toFixed(1)),
+        'Rata-rata L/100km': avgEfficiency > 0 ? Number((100 / avgEfficiency).toFixed(2)) : 0,
+        'Rata-rata Biaya/km': avgEfficiency > 0 ? Math.round((settings.fuelPricePerLiter || 10000) / avgEfficiency) : 0
+      };
+    });
 
   // Chart style helpers
   const chartTooltipStyle = {
@@ -960,88 +981,274 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
         </motion.div>
       </div>
 
-      {/* ═══════════════════════ 5. FUEL EFFICIENCY ═══════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
-        {/* ── Fuel Efficiency Trend ── */}
-        <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-sm">
-          <div className="p-5 pb-2">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+      {/* ═══════════════════════ 5. FUEL EFFICIENCY & CONSUMPTION TREND ═══════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
+        {/* ── Fuel Efficiency & Consumption Trend Chart (2 columns) ── */}
+        <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-sm lg:col-span-2">
+          <div className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
                   <TrendingUp className="w-4 h-4" />
                 </div>
-                Efisiensi BBM
-              </h3>
-              {avgEfficiency > 0 && (
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
-                  Ø {avgEfficiency.toFixed(1)} km/L
-                </span>
-              )}
+                <h3 className="font-bold text-slate-800 dark:text-white">
+                  Grafik Konsumsi & Efisiensi BBM
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Tren performa bahan bakar per kilometer (12 pengisian terakhir)
+              </p>
             </div>
-            <p className="text-xs text-slate-400">Tren efisiensi 10 pengisian terakhir (km/L)</p>
+
+            {/* Metric Mode Switcher */}
+            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold self-start sm:self-auto">
+              <button
+                onClick={() => setFuelMetricMode('km_l')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  fuelMetricMode === 'km_l'
+                    ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                km/L
+              </button>
+              <button
+                onClick={() => setFuelMetricMode('l_100km')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  fuelMetricMode === 'l_100km'
+                    ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                L/100km
+              </button>
+              <button
+                onClick={() => setFuelMetricMode('cost_km')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  fuelMetricMode === 'cost_km'
+                    ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                Rp/km
+              </button>
+            </div>
           </div>
 
-          <div className="h-56 md:h-64 w-full px-2 pb-4">
-            {efficiencyTrendData.length === 0 ? (
-              <div className="w-full h-full flex flex-col items-center justify-center px-6">
-                <div className="p-4 rounded-full bg-slate-50 dark:bg-slate-800/50 mb-3">
-                  <Fuel className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+          <div className="p-4 pt-5">
+            <div className="h-64 md:h-72 w-full">
+              {efficiencyTrendData.length === 0 ? (
+                <div className="w-full h-full flex flex-col items-center justify-center px-6">
+                  <div className="p-4 rounded-full bg-slate-50 dark:bg-slate-800/50 mb-3">
+                    <Fuel className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Belum Ada Data Efisiensi</p>
+                  <p className="text-xs text-slate-400 mt-1 text-center max-w-[240px]">
+                    Catat minimal 2 pengisian BBM untuk memantau konsumsi per kilometer
+                  </p>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => onNavigate('fuel')}
+                    className="mt-3 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer"
+                  >
+                    Isi BBM Sekarang
+                  </motion.button>
                 </div>
-                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Belum Ada Data</p>
-                <p className="text-xs text-slate-400 mt-1 text-center max-w-[220px]">
-                  Catat minimal 2 pengisian BBM untuk melihat efisiensi
-                </p>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => onNavigate('fuel')}
-                  className="mt-3 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer"
-                >
-                  Catat BBM
-                </motion.button>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={efficiencyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" className="dark:hidden" strokeOpacity={0.6} />
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" className="hidden dark:block" strokeOpacity={0.3} />
-                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} stroke="#cbd5e1" className="dark:stroke-slate-800" />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} stroke="#cbd5e1" className="dark:stroke-slate-800" />
-                  <Tooltip
-                    contentStyle={chartTooltipStyle}
-                    labelStyle={{ fontWeight: 'bold', color: '#cbd5e1', marginBottom: 6 }}
-                    itemStyle={{ padding: '2px 0' }}
-                  />
-                  <Legend
-                    iconType="plainline"
-                    wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="Efisiensi (km/L)"
-                    stroke="#10b981"
-                    strokeWidth={2.5}
-                    dot={{ fill: '#10b981', r: 4, stroke: '#fff', strokeWidth: 2 }}
-                    activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
-                    animationDuration={1200}
-                    animationEasing="ease-out"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="Rata-rata"
-                    stroke="#f43f5e"
-                    strokeDasharray="6 3"
-                    strokeWidth={1.5}
-                    dot={false}
-                    animationDuration={1200}
-                    animationEasing="ease-out"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={efficiencyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="colorKmL" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorL100" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorCostKm" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" className="dark:hidden" strokeOpacity={0.6} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" className="hidden dark:block" strokeOpacity={0.3} />
+                    <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} stroke="#cbd5e1" className="dark:stroke-slate-800" />
+                    <YAxis
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      stroke="#cbd5e1"
+                      className="dark:stroke-slate-800"
+                      unit={fuelMetricMode === 'km_l' ? ' km/L' : fuelMetricMode === 'l_100km' ? ' L' : ' Rp'}
+                    />
+                    <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={{ fontWeight: 'bold', color: '#cbd5e1', marginBottom: 6 }}
+                      formatter={(val: any, name: any) => [
+                        fuelMetricMode === 'cost_km'
+                          ? `Rp ${val} / km`
+                          : fuelMetricMode === 'l_100km'
+                            ? `${val} Liter / 100 km`
+                            : `${val} km / Liter`,
+                        name
+                      ]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+
+                    {fuelMetricMode === 'km_l' && (
+                      <>
+                        <Area
+                          type="monotone"
+                          dataKey="Efisiensi (km/L)"
+                          stroke="#10b981"
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#colorKmL)"
+                          activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                          animationDuration={1000}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="Rata-rata km/L"
+                          stroke="#ef4444"
+                          strokeDasharray="5 5"
+                          strokeWidth={1.5}
+                          dot={false}
+                        />
+                      </>
+                    )}
+
+                    {fuelMetricMode === 'l_100km' && (
+                      <>
+                        <Area
+                          type="monotone"
+                          dataKey="Konsumsi (L/100km)"
+                          stroke="#f59e0b"
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#colorL100)"
+                          activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }}
+                          animationDuration={1000}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="Rata-rata L/100km"
+                          stroke="#ef4444"
+                          strokeDasharray="5 5"
+                          strokeWidth={1.5}
+                          dot={false}
+                        />
+                      </>
+                    )}
+
+                    {fuelMetricMode === 'cost_km' && (
+                      <>
+                        <Area
+                          type="monotone"
+                          dataKey="Biaya/km (Rp)"
+                          stroke="#8b5cf6"
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#colorCostKm)"
+                          activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }}
+                          animationDuration={1000}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="Rata-rata Biaya/km"
+                          stroke="#ef4444"
+                          strokeDasharray="5 5"
+                          strokeWidth={1.5}
+                          dot={false}
+                        />
+                      </>
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </div>
         </motion.div>
 
+        {/* ── Fuel Consumption Analytics & Anatomy (1 column) ── */}
+        <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-5 shadow-sm space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/60">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-800 dark:text-white">
+                  Anatomi Konsumsi BBM
+                </h3>
+              </div>
+              {avgEfficiency > 0 && (
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  avgEfficiency >= 45
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40'
+                    : avgEfficiency >= 35
+                      ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40'
+                      : avgEfficiency >= 25
+                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40'
+                        : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40'
+                }`}>
+                  {avgEfficiency >= 45 ? '🌿 Sangat Hemat' : avgEfficiency >= 35 ? '🔵 Standard Irit' : avgEfficiency >= 25 ? '🟡 Cukup Boros' : '🔴 Perlu Tune-up'}
+                </span>
+              )}
+            </div>
+
+            {/* Matrix Items */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
+                  KONSUMSI / 100 KM
+                </span>
+                <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
+                  {avgEfficiency > 0 ? `${(100 / avgEfficiency).toFixed(2)} L` : '—'}
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5">Liter per 100 km</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
+                  BIAYA PER KM
+                </span>
+                <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
+                  {avgEfficiency > 0 ? `Rp ${(settings.fuelPricePerLiter / avgEfficiency).toFixed(0)}` : '—'}
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5">Rupiah per kilometer</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
+                  JARAK / TANGKI (4L)
+                </span>
+                <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
+                  {avgEfficiency > 0 ? `${(4 * avgEfficiency).toFixed(0)} km` : '—'}
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5">Jarak full-tank (est.)</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
+                  EST. BIAYA 100 KM
+                </span>
+                <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
+                  {avgEfficiency > 0 ? formatIDR((100 / avgEfficiency) * (settings.fuelPricePerLiter || 10000)) : '—'}
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5">Estimasi touring 100km</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Efficiency Optimization Note */}
+          <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs flex items-start gap-2.5">
+            <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+            <p className="text-indigo-900 dark:text-indigo-200 leading-relaxed text-[11px]">
+              <strong>Tips Hemat BBM:</strong> Menjaga tekanan angin ban ideal (29-33 PSI) dan rantai terlumasi dengan baik dapat menghemat konsumsi BBM hingga 10-15%.
+            </p>
+          </div>
+        </motion.div>
       </div>
 
       {/* ═══════════════════════ FOOTER SPACER ═══════════════════════ */}
