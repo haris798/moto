@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { OilLog, FuelLog, AppSettings, Jarak } from '../types';
+import { OilLog, FuelLog, AppSettings, Jarak, ServiceLog } from '../types';
 import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
 import {
@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 interface DashboardProps {
   oilLogs: OilLog[];
   fuelLogs: FuelLog[];
+  serviceLogs?: ServiceLog[];
   settings: AppSettings;
   onNavigate: (tab: string) => void;
 }
@@ -101,12 +102,13 @@ const getOilHealthColor = (pct: number) => {
 };
 
 // ─── Dashboard Component ─────────────────────────────────────────────────────
-export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: DashboardProps) {
+export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], settings, onNavigate }: DashboardProps) {
   // ── Derived Data ──────────────────────────────────────────────────────────
   const maxOilMileage = oilLogs.length > 0 ? Math.max(...oilLogs.map(l => l.mileage)) : 0;
   const maxFuelMileage = fuelLogs.length > 0 ? Math.max(...fuelLogs.map(l => l.mileage)) : 0;
-  const currentMileage = Math.max(maxOilMileage, maxFuelMileage);
-  const allMileages = [...oilLogs.map(l => l.mileage), ...fuelLogs.map(l => l.mileage)].filter(m => m > 0);
+  const maxServiceMileage = serviceLogs.length > 0 ? Math.max(...serviceLogs.map(l => l.mileage)) : 0;
+  const currentMileage = Math.max(maxOilMileage, maxFuelMileage, maxServiceMileage);
+  const allMileages = [...oilLogs.map(l => l.mileage), ...fuelLogs.map(l => l.mileage), ...serviceLogs.map(l => l.mileage)].filter(m => m > 0);
   const minMileage = allMileages.length > 0 ? Math.min(...allMileages) : 0;
   const odometerSpan = currentMileage - minMileage;
 
@@ -128,32 +130,38 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
   const oilLifePercent = lastOilLog ? Math.min(oilLifeKmPercent, oilLifeDaysPercent) : 0;
   const healthColor = getOilHealthColor(oilLifePercent);
 
-  // BBM Analytics
+  // BBM & Servis Analytics
   const totalFuelCost = fuelLogs.reduce((sum, l) => sum + l.cost, 0);
   const totalLiters = fuelLogs.reduce((sum, l) => sum + l.liters, 0);
   const logsWithEfficiency = fuelLogs.filter(l => l.efficiency && l.efficiency > 0);
   const avgEfficiency = logsWithEfficiency.length > 0
     ? logsWithEfficiency.reduce((sum, l) => sum + (l.efficiency || 0), 0) / logsWithEfficiency.length : 0;
   const totalOilCost = oilLogs.reduce((sum, l) => sum + l.cost, 0);
-  const totalExpenses = totalFuelCost + totalOilCost;
+  const totalServiceCost = serviceLogs.reduce((sum, l) => sum + l.cost, 0);
+  const totalExpenses = totalFuelCost + totalOilCost + totalServiceCost;
 
   // Monthly chart data
-  const monthlyDataMap = new Map<string, { month: string; fuel: number; oil: number }>();
+  const monthlyDataMap = new Map<string, { month: string; fuel: number; oil: number; service: number }>();
   const today = new Date();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     const key = getMonthYearKey(d.toISOString());
-    monthlyDataMap.set(key, { month: key, fuel: 0, oil: 0 });
+    monthlyDataMap.set(key, { month: key, fuel: 0, oil: 0, service: 0 });
   }
   fuelLogs.forEach(log => {
     const key = getMonthYearKey(log.date);
     if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.fuel += log.cost;
-    else monthlyDataMap.set(key, { month: key, fuel: log.cost, oil: 0 });
+    else monthlyDataMap.set(key, { month: key, fuel: log.cost, oil: 0, service: 0 });
   });
   oilLogs.forEach(log => {
     const key = getMonthYearKey(log.date);
     if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.oil += log.cost;
-    else monthlyDataMap.set(key, { month: key, fuel: 0, oil: log.cost });
+    else monthlyDataMap.set(key, { month: key, fuel: 0, oil: log.cost, service: 0 });
+  });
+  serviceLogs.forEach(log => {
+    const key = getMonthYearKey(log.date);
+    if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.service += log.cost;
+    else monthlyDataMap.set(key, { month: key, fuel: 0, oil: 0, service: log.cost });
   });
   const sortedMonthlyData = Array.from(monthlyDataMap.values());
 
@@ -284,12 +292,14 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
 
   const filteredFuelLogs = fuelLogs.filter(l => isDateInRange(l.date));
   const filteredOilLogs = oilLogs.filter(l => isDateInRange(l.date));
+  const filteredServiceLogs = serviceLogs.filter(l => isDateInRange(l.date));
   const filteredJarakData = jarakData.filter(r => isDateInRange(r.date));
 
   const filteredFuelCost = filteredFuelLogs.reduce((sum, l) => sum + l.cost, 0);
   const filteredFuelLiters = filteredFuelLogs.reduce((sum, l) => sum + l.liters, 0);
   const filteredOilCost = filteredOilLogs.reduce((sum, l) => sum + l.cost, 0);
-  const filteredTotalOperational = filteredFuelCost + filteredOilCost;
+  const filteredServiceCost = filteredServiceLogs.reduce((sum, l) => sum + l.cost, 0);
+  const filteredTotalOperational = filteredFuelCost + filteredOilCost + filteredServiceCost;
 
   const filteredEffLogs = filteredFuelLogs.filter(l => l.efficiency && l.efficiency > 0);
   const filteredAvgEfficiency = filteredEffLogs.length > 0
@@ -298,7 +308,7 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
 
   const filteredJarakKm = filteredJarakData.reduce((sum, r) => sum + r.total_km, 0);
 
-  const allLogsAsc = [...oilLogs, ...fuelLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const allLogsAsc = [...oilLogs, ...fuelLogs, ...serviceLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const rangeLogs = allLogsAsc.filter(l => isDateInRange(l.date));
 
   let filteredLogKm = 0;
@@ -374,22 +384,30 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
               </div>
             </div>
 
-            <div className="flex gap-2.5">
+            <div className="flex flex-wrap gap-2 md:gap-2.5">
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => onNavigate('oil')}
-                className="px-4 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-2 transition-all cursor-pointer border border-white/15 shadow-lg"
+                className="px-3.5 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg"
               >
-                <Droplets className="w-4 h-4" /> Catat Oli
+                <Droplets className="w-4 h-4" /> Oli
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => onNavigate('fuel')}
-                className="px-4 py-2.5 bg-white/95 text-indigo-700 font-semibold rounded-xl text-sm flex items-center gap-2 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/25"
+                className="px-3.5 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg"
               >
-                <Fuel className="w-4 h-4" /> Isi BBM
+                <Fuel className="w-4 h-4" /> BBM
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => onNavigate('service')}
+                className="px-3.5 py-2.5 bg-white/95 text-indigo-700 font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/25"
+              >
+                <Wrench className="w-4 h-4" /> Servis
               </motion.button>
             </div>
           </div>
@@ -397,10 +415,10 @@ export default function Dashboard({ oilLogs, fuelLogs, settings, onNavigate }: D
           {/* Mini stats row */}
           <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: Timer, label: 'Total Pencatatan', value: `${oilLogs.length + fuelLogs.length} log` },
-              { icon: Target, label: 'Rata-rata km/hari', value: avgEfficiency > 0 ? `${avgEfficiency.toFixed(1)} km/L` : '-' },
+              { icon: Timer, label: 'Total Catatan', value: `${oilLogs.length + fuelLogs.length + serviceLogs.length} log` },
+              { icon: Target, label: 'Konsumsi BBM', value: avgEfficiency > 0 ? `${avgEfficiency.toFixed(1)} km/L` : '-' },
               { icon: Flame, label: 'Total Biaya BBM', value: formatIDR(totalFuelCost) },
-              { icon: Wrench, label: 'Servis Oli', value: `${oilLogs.length}x ganti` },
+              { icon: Wrench, label: 'Total Servis', value: `${serviceLogs.length}x servis` },
             ].map((item, i) => (
               <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                 <div className="flex items-center gap-2 text-indigo-200/70 text-[11px] font-medium tracking-wider mb-1">

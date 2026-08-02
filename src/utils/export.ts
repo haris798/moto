@@ -1,4 +1,4 @@
-import { OilLog, FuelLog } from '../types';
+import { OilLog, FuelLog, ServiceLog } from '../types';
 
 /**
  * Helper to format currency in Indonesian Rupiah
@@ -17,7 +17,8 @@ export function formatIDR(value: number): string {
 export function exportToCSV(
   oilLogs: OilLog[],
   fuelLogs: FuelLog[],
-  type: 'oil' | 'fuel' | 'all'
+  type: 'oil' | 'fuel' | 'service' | 'all',
+  serviceLogs?: ServiceLog[]
 ) {
   const BOM = '\uFEFF'; // Excel UTF-8 BOM
 
@@ -46,7 +47,6 @@ export function exportToCSV(
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    // Revoke object URL to free memory
     URL.revokeObjectURL(url);
   }
 
@@ -75,15 +75,43 @@ export function exportToCSV(
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    // Revoke object URL to free memory
+    URL.revokeObjectURL(url);
+  }
+
+  if ((type === 'service' || type === 'all') && serviceLogs && serviceLogs.length > 0) {
+    let csvContent = 'No,Tanggal,Jarak (km),Kategori,Rincian Pengerjaan,Spare Part Diganti,Biaya (Rp),Catatan\n';
+
+    serviceLogs.forEach((log, index) => {
+      const parts = (log.parts_changed || []).join('; ');
+      const row = [
+        index + 1,
+        log.date,
+        log.mileage,
+        `"${(log.service_type || '').replace(/"/g, '""')}"`,
+        `"${(log.description || '').replace(/"/g, '""')}"`,
+        `"${parts.replace(/"/g, '""')}"`,
+        log.cost,
+        `"${(log.notes || '').replace(/"/g, '""')}"`,
+      ].join(',');
+      csvContent += row + '\n';
+    });
+
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Riwayat_Servis_Sparepart_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
 }
 
 /**
- * Triggers a beautiful print layout of the logs which can be saved directly as PDF by the user
+ * Triggers a print layout of the logs which can be saved directly as PDF by the user
  */
-export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
+export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[], serviceLogs: ServiceLog[] = []) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert('Pop-up diblokir! Harap izinkan pop-up untuk mencetak laporan PDF.');
@@ -93,8 +121,9 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
   // Calculate quick stats
   const totalOilCost = oilLogs.reduce((sum, log) => sum + log.cost, 0);
   const totalFuelCost = fuelLogs.reduce((sum, log) => sum + log.cost, 0);
-  const totalLiters = fuelLogs.reduce((sum, log) => sum + log.liters, 0);
-  
+  const totalServiceCost = serviceLogs.reduce((sum, log) => sum + log.cost, 0);
+  const grandTotalCost = totalOilCost + totalFuelCost + totalServiceCost;
+
   // Average fuel efficiency
   const logsWithEfficiency = fuelLogs.filter(log => log.efficiency && log.efficiency > 0);
   const avgEfficiency = logsWithEfficiency.length > 0
@@ -103,7 +132,8 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
 
   const maxMileage = Math.max(
     oilLogs.length > 0 ? oilLogs[0].mileage : 0,
-    fuelLogs.length > 0 ? fuelLogs[0].mileage : 0
+    fuelLogs.length > 0 ? fuelLogs[0].mileage : 0,
+    serviceLogs.length > 0 ? serviceLogs[0].mileage : 0
   );
 
   const formattedDate = new Date().toLocaleDateString('id-ID', {
@@ -180,7 +210,7 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
         }
         h2 {
           font-size: 16px;
-          border-left: 4px solid #0284c7;
+          border-left: 4px solid #d97706;
           padding-left: 8px;
           margin: 24px 0 12px 0;
           color: #0f172a;
@@ -214,6 +244,17 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
           color: #eab308;
           font-weight: bold;
         }
+        .badge {
+          display: inline-block;
+          background: #f1f5f9;
+          border: 1px solid #cbd5e1;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 10px;
+          font-weight: bold;
+          margin-right: 4px;
+          margin-bottom: 2px;
+        }
         .footer {
           margin-top: 40px;
           text-align: center;
@@ -223,18 +264,12 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
           padding-top: 16px;
         }
         @media print {
-          body {
-            padding: 0;
-          }
-          button {
-            display: none;
-          }
-          .no-print {
-            display: none;
-          }
+          body { padding: 0; }
+          button { display: none; }
+          .no-print { display: none; }
         }
         .btn-print {
-          background-color: #0284c7;
+          background-color: #d97706;
           color: white;
           border: none;
           padding: 10px 18px;
@@ -246,9 +281,6 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
           align-items: center;
           gap: 8px;
           font-size: 13px;
-        }
-        .btn-print:hover {
-          background-color: #0369a1;
         }
       </style>
     </head>
@@ -262,8 +294,8 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
 
       <div class="header">
         <div class="title-area">
-          <h1>Laporan Perawatan & Konsumsi BBM Motor</h1>
-          <p>Dokumentasi Performa Kendaraan Secara Berkala</p>
+          <h1>Laporan Perawatan, Servis & BBM Motor</h1>
+          <p>Dokumentasi Performa & Riwayat Sparepart Kendaraan</p>
         </div>
         <div class="meta-area">
           <div>Dicetak pada:</div>
@@ -273,22 +305,53 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
 
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-label">Jarak Tempuh Terakhir</div>
+          <div class="stat-label">Odometer Terakhir</div>
           <div class="stat-value">${maxMileage.toLocaleString('id-ID')} km</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Rata-rata Konsumsi BBM</div>
-          <div class="stat-value">${avgEfficiency} km/L</div>
+          <div class="stat-label">Biaya Servis & Sparepart</div>
+          <div class="stat-value">${formatIDR(totalServiceCost)}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Total Biaya Ganti Oli</div>
-          <div class="stat-value">${formatIDR(totalOilCost)}</div>
+          <div class="stat-label">Biaya Oli & BBM</div>
+          <div class="stat-value">${formatIDR(totalOilCost + totalFuelCost)}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Total Pengeluaran BBM</div>
-          <div class="stat-value">${formatIDR(totalFuelCost)}</div>
+          <div class="stat-label">Total Seluruh Pengeluaran</div>
+          <div class="stat-value" style="color: #d97706">${formatIDR(grandTotalCost)}</div>
         </div>
       </div>
+
+      <h2>Riwayat Servis & Pergantian Sparepart</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 5%">No</th>
+            <th style="width: 12%">Tanggal</th>
+            <th style="width: 13%">Odometer</th>
+            <th style="width: 20%">Kategori & Pengerjaan</th>
+            <th style="width: 25%">Sparepart Diganti</th>
+            <th style="width: 13%">Biaya</th>
+            <th style="width: 12%">Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${serviceLogs.length === 0
+            ? '<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 20px;">Belum ada data servis & pergantian sparepart</td></tr>'
+            : serviceLogs.map((log, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${new Date(log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                  <td>${log.mileage.toLocaleString('id-ID')} km</td>
+                  <td><strong>${log.service_type}</strong><br><span style="font-size:11px; color:#475569">${log.description}</span></td>
+                  <td>${(log.parts_changed && log.parts_changed.length > 0) ? log.parts_changed.map(p => `<span class="badge">${p}</span>`).join('') : '-'}</td>
+                  <td style="font-weight: bold; color: #d97706">${formatIDR(log.cost)}</td>
+                  <td><span style="font-style: italic; color: #64748b">${log.notes || '-'}</span></td>
+                </tr>
+              `).join('')
+          }
+        </tbody>
+      </table>
 
       <h2>Riwayat Penggantian Oli Motor</h2>
       <table>
@@ -299,7 +362,7 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
             <th style="width: 15%">Jarak Tempuh</th>
             <th style="width: 25%">Merek & Tipe Oli</th>
             <th style="width: 15%">Biaya</th>
-            <th style="width: 10%">Rating Oli</th>
+            <th style="width: 10%">Rating</th>
             <th style="width: 15%">Catatan</th>
           </tr>
         </thead>
@@ -357,8 +420,8 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
       </table>
 
       <div class="footer">
-        <p>Laporan ini dibuat secara otomatis oleh Aplikasi <b>Oil & Fuel Tracker Motor</b>.</p>
-        <p>Sistem Pelacakan Mandiri & Sinkronisasi Real-Time.</p>
+        <p>Laporan ini dibuat secara otomatis oleh Aplikasi <b>Motor.ku — Jurnal Oli, BBM & Servis</b>.</p>
+        <p>Sistem Pelacakan Mandiri & Management Perawatan Kendaraan.</p>
       </div>
     </body>
     </html>
@@ -367,3 +430,4 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[]) {
   printWindow.document.write(htmlContent);
   printWindow.document.close();
 }
+

@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { OilLog, FuelLog, Jarak } from '../types';
+import { OilLog, FuelLog, ServiceLog, Jarak } from '../types';
 
 let supabaseInstance: SupabaseClient | null = null;
 let currentUrl = '';
@@ -77,22 +77,24 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
 export async function syncWithSupabase(
   localOilLogs: OilLog[],
   localFuelLogs: FuelLog[],
-  onSyncProgress: (status: string) => void
+  onSyncProgress: (status: string) => void,
+  localServiceLogs: ServiceLog[] = []
 ): Promise<{
   syncedOilLogs: OilLog[];
   syncedFuelLogs: FuelLog[];
+  syncedServiceLogs: ServiceLog[];
   success: boolean;
   message: string;
 }> {
   const client = getSupabaseClient();
   if (!client) {
-    return { syncedOilLogs: localOilLogs, syncedFuelLogs: localFuelLogs, success: false, message: 'Supabase belum dikonfigurasi.' };
+    return { syncedOilLogs: localOilLogs, syncedFuelLogs: localFuelLogs, syncedServiceLogs: localServiceLogs, success: false, message: 'Supabase belum dikonfigurasi.' };
   }
 
   try {
     const { data: { user }, error: authError } = await client.auth.getUser();
     if (authError || !user) {
-      return { syncedOilLogs: localOilLogs, syncedFuelLogs: localFuelLogs, success: false, message: 'Silakan login terlebih dahulu untuk sinkronisasi.' };
+      return { syncedOilLogs: localOilLogs, syncedFuelLogs: localFuelLogs, syncedServiceLogs: localServiceLogs, success: false, message: 'Silakan login terlebih dahulu untuk sinkronisasi.' };
     }
 
     const userId = user.id;
@@ -112,6 +114,8 @@ export async function syncWithSupabase(
       await client.from('oil_logs').delete().in('id', deletedIds).eq('user_id', userId);
       // Delete fuel logs
       await client.from('fuel_logs').delete().in('id', deletedIds).eq('user_id', userId);
+      // Delete service logs
+      await client.from('service_logs').delete().in('id', deletedIds).eq('user_id', userId);
       // Clear local deletion log
       localStorage.setItem('deleted_log_ids', '[]');
     }
@@ -329,9 +333,98 @@ export async function syncWithSupabase(
       }
     }
 
+    // 4. Sync Service Logs
+    onSyncProgress('Sinkronisasi riwayat servis & sparepart...');
+    const { data: remoteServiceLogs, error: serviceError } = await client
+      .from('service_logs')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (serviceError) {
+      console.warn(`Sinkronisasi servis diabaikan (tabel mungkin belum dibuat): ${serviceError.message}`);
+    }
+
+    const safeRemoteServiceLogs = Array.isArray(remoteServiceLogs) ? remoteServiceLogs : [];
+    const safeLocalServiceLogs = Array.isArray(localServiceLogs) ? localServiceLogs : [];
+
+    const mergedServiceLogs: ServiceLog[] = [...safeLocalServiceLogs];
+    const remoteServiceMap = new Map<string, any>(safeRemoteServiceLogs.map(item => [item.id, item]));
+
+    for (const local of safeLocalServiceLogs) {
+      const remote = remoteServiceMap.get(local.id);
+      if (!remote) {
+        // Upsert to remote
+        await client.from('service_logs').upsert({
+          id: local.id,
+          user_id: userId,
+          date: local.date || new Date().toISOString().split('T')[0],
+          mileage: isFinite(local.mileage) && !isNaN(local.mileage) ? Math.round(Number(local.mileage)) : 0,
+          cost: isFinite(local.cost) && !isNaN(local.cost) ? Number(local.cost) : 0,
+          service_type: local.service_type || 'Servis Motor',
+          description: local.description || '',
+          parts_changed: Array.isArray(local.parts_changed) ? local.parts_changed : [],
+          notes: local.notes || '',
+          updated_at: local.updated_at || new Date().toISOString()
+        });
+      } else {
+        const localTime = new Date(local.updated_at || 0).getTime();
+        const remoteTime = new Date(remote.updated_at || 0).getTime();
+
+        if (localTime > remoteTime) {
+          await client.from('service_logs').update({
+            date: local.date || new Date().toISOString().split('T')[0],
+            mileage: isFinite(local.mileage) && !isNaN(local.mileage) ? Math.round(Number(local.mileage)) : 0,
+            cost: isFinite(local.cost) && !isNaN(local.cost) ? Number(local.cost) : 0,
+            service_type: local.service_type || 'Servis Motor',
+            description: local.description || '',
+            parts_changed: Array.isArray(local.parts_changed) ? local.parts_changed : [],
+            notes: local.notes || '',
+            updated_at: local.updated_at || new Date().toISOString()
+          }).eq('id', local.id).eq('user_id', userId);
+        } else if (remoteTime > localTime) {
+          const index = mergedServiceLogs.findIndex(item => item.id === local.id);
+          if (index !== -1) {
+            mergedServiceLogs[index] = {
+              id: remote.id,
+              user_id: remote.user_id,
+              date: remote.date,
+              mileage: remote.mileage,
+              cost: remote.cost,
+              service_type: remote.service_type,
+              description: remote.description,
+              parts_changed: remote.parts_changed || [],
+              notes: remote.notes,
+              created_at: remote.created_at,
+              updated_at: remote.updated_at
+            };
+          }
+        }
+      }
+    }
+
+    for (const remote of safeRemoteServiceLogs) {
+      const localExists = safeLocalServiceLogs.some(l => l.id === remote.id);
+      if (!localExists) {
+        mergedServiceLogs.push({
+          id: remote.id,
+          user_id: remote.user_id,
+          date: remote.date,
+          mileage: remote.mileage,
+          cost: remote.cost,
+          service_type: remote.service_type,
+          description: remote.description,
+          parts_changed: remote.parts_changed || [],
+          notes: remote.notes,
+          created_at: remote.created_at,
+          updated_at: remote.updated_at
+        });
+      }
+    }
+
     // Sort logs descending by date
     mergedOilLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     mergedFuelLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    mergedServiceLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // Update settings in cloud if needed
     onSyncProgress('Sinkronisasi pengaturan...');
@@ -348,6 +441,7 @@ export async function syncWithSupabase(
     return {
       syncedOilLogs: mergedOilLogs,
       syncedFuelLogs: mergedFuelLogs,
+      syncedServiceLogs: mergedServiceLogs,
       success: true,
       message: 'Sinkronisasi berhasil!'
     };
@@ -356,6 +450,7 @@ export async function syncWithSupabase(
     return {
       syncedOilLogs: localOilLogs,
       syncedFuelLogs: localFuelLogs,
+      syncedServiceLogs: localServiceLogs,
       success: false,
       message: `Sinkronisasi gagal: ${error.message || error}`
     };
@@ -432,7 +527,24 @@ CREATE TABLE IF NOT EXISTS fuel_logs (
 );
 
 -- ============================================================
--- 3. TABEL UTAMA: Pengaturan Pengguna
+-- 3. TABEL UTAMA: Riwayat Servis & Sparepart
+-- ============================================================
+CREATE TABLE IF NOT EXISTS service_logs (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  mileage INTEGER NOT NULL,
+  cost NUMERIC NOT NULL,
+  service_type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  parts_changed TEXT[],
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ============================================================
+-- 4. TABEL UTAMA: Pengaturan Pengguna
 -- ============================================================
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -441,7 +553,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
 );
 
 -- ============================================================
--- 4. TABEL: Jarak Tempuh Harian
+-- 5. TABEL: Jarak Tempuh Harian
 -- ============================================================
 CREATE TABLE IF NOT EXISTS jarak (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -462,6 +574,7 @@ CREATE INDEX IF NOT EXISTS idx_jarak_user_date
 -- ============================================================
 ALTER TABLE oil_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fuel_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jarak ENABLE ROW LEVEL SECURITY;
 
@@ -473,6 +586,9 @@ CREATE POLICY "Pengguna hanya bisa melihat data olinya sendiri"
 
 CREATE POLICY "Pengguna hanya bisa melihat data bbmnya sendiri"
   ON fuel_logs FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Pengguna hanya bisa melihat data servisnya sendiri"
+  ON service_logs FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY "Pengguna hanya bisa melihat pengaturannya sendiri"
   ON user_settings FOR ALL USING (auth.uid() = user_id);
