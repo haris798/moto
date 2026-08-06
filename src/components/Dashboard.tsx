@@ -139,29 +139,42 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const totalOilCost = oilLogs.reduce((sum, l) => sum + l.cost, 0);
   const totalServiceCost = serviceLogs.reduce((sum, l) => sum + l.cost, 0);
   const totalExpenses = totalFuelCost + totalOilCost + totalServiceCost;
+  
+  const today = new Date();
+
+  // Current Month Data
+  const currentMonthFuelCost = fuelLogs
+    .filter(l => new Date(l.date).getMonth() === today.getMonth() && new Date(l.date).getFullYear() === today.getFullYear())
+    .reduce((sum, l) => sum + l.cost, 0);
+  const currentMonthServiceCost = serviceLogs
+    .filter(l => new Date(l.date).getMonth() === today.getMonth() && new Date(l.date).getFullYear() === today.getFullYear())
+    .reduce((sum, l) => sum + l.cost, 0);
+  const currentMonthTotalCost = currentMonthFuelCost + currentMonthServiceCost;
 
   // Monthly chart data
-  const monthlyDataMap = new Map<string, { month: string; fuel: number; oil: number; service: number }>();
-  const today = new Date();
+  const monthlyDataMap = new Map<string, { month: string; fuel: number; fuelLiters: number; oil: number; service: number }>();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     const key = getMonthYearKey(d.toISOString());
-    monthlyDataMap.set(key, { month: key, fuel: 0, oil: 0, service: 0 });
+    monthlyDataMap.set(key, { month: key, fuel: 0, fuelLiters: 0, oil: 0, service: 0 });
   }
   fuelLogs.forEach(log => {
     const key = getMonthYearKey(log.date);
-    if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.fuel += log.cost;
-    else monthlyDataMap.set(key, { month: key, fuel: log.cost, oil: 0, service: 0 });
+    if (monthlyDataMap.has(key)) {
+      monthlyDataMap.get(key)!.fuel += log.cost;
+      monthlyDataMap.get(key)!.fuelLiters += (log.liters || 0);
+    }
+    else monthlyDataMap.set(key, { month: key, fuel: log.cost, fuelLiters: log.liters || 0, oil: 0, service: 0 });
   });
   oilLogs.forEach(log => {
     const key = getMonthYearKey(log.date);
     if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.oil += log.cost;
-    else monthlyDataMap.set(key, { month: key, fuel: 0, oil: log.cost, service: 0 });
+    else monthlyDataMap.set(key, { month: key, fuel: 0, fuelLiters: 0, oil: log.cost, service: 0 });
   });
   serviceLogs.forEach(log => {
     const key = getMonthYearKey(log.date);
     if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.service += log.cost;
-    else monthlyDataMap.set(key, { month: key, fuel: 0, oil: 0, service: log.cost });
+    else monthlyDataMap.set(key, { month: key, fuel: 0, fuelLiters: 0, oil: 0, service: log.cost });
   });
   const sortedMonthlyData = Array.from(monthlyDataMap.values());
 
@@ -475,7 +488,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
       </motion.div>
 
       {/* ═══════════════════════ 1.5 KARTU RINGKASAN KESEHATAN MOTOR ═══════════════════════ */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 md:gap-4">
+      <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 md:gap-4">
         {/* Card 1: Total Biaya Servis 30 Hari Terakhir */}
         <motion.div
           whileHover={{ y: -2 }}
@@ -485,7 +498,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-indigo-600" />
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <span className="text-[11px] font-bold capitalize tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                 <Wrench className="w-3.5 h-3.5 text-indigo-500" />
                 Total Biaya Servis (30 Hari Terakhir)
               </span>
@@ -512,7 +525,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <span className="text-[11px] font-bold capitalize tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                 <Gauge className="w-3.5 h-3.5 text-emerald-500" />
                 Jarak Tempuh Sejak Ganti Oli
               </span>
@@ -531,6 +544,34 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             </div>
             <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40 shrink-0 group-hover:scale-110 transition-transform">
               <Activity className="w-6 h-6" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Card 3: Total Pengeluaran Bulan Berjalan */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 md:p-5 shadow-xs hover:shadow-md transition-all cursor-default group"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 via-blue-500 to-blue-600" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold capitalize tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-blue-500" />
+                Total Pengeluaran Bulan Ini
+              </span>
+              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display">
+                {formatIDR(currentMonthTotalCost)}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <Coins className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>
+                  {formatIDR(currentMonthFuelCost)} BBM • {formatIDR(currentMonthServiceCost)} Servis
+                </span>
+              </p>
+            </div>
+            <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 shrink-0 transition-transform">
+              <TrendingUp className="w-6 h-6" />
             </div>
           </div>
         </motion.div>
@@ -1103,8 +1144,61 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
         </motion.div>
       </div>
 
-      {/* ═══════════════════════ 5. FUEL EFFICIENCY & CONSUMPTION TREND ═══════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
+      {/* ═══════════════════════ 5. TREN PENGGUNAAN BBM (LITER) ═══════════════════════ */}
+      <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-sm mt-4 md:mt-5">
+        <div className="p-5 pb-2">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                <Fuel className="w-4 h-4" />
+              </div>
+              Tren Penggunaan BBM
+            </h3>
+            <span className="text-xs text-slate-400 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-lg font-medium">
+              6 bulan terakhir
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">Total volume bahan bakar (liter) per bulan</p>
+        </div>
+
+        <div className="h-64 md:h-72 w-full px-2 pb-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={sortedMonthlyData} margin={{ top: 10, right: 10, left: 5, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" className="dark:hidden" strokeOpacity={0.6} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" className="hidden dark:block" strokeOpacity={0.3} />
+              <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} stroke="#cbd5e1" className="dark:stroke-slate-800" />
+              <YAxis
+                tick={{ fill: '#94a3b8', fontSize: 11 }}
+                stroke="#cbd5e1"
+                className="dark:stroke-slate-800"
+                tickFormatter={(v) => `${v} L`}
+              />
+              <Tooltip
+                formatter={(value: any) => [`${Number(value).toFixed(1)} Liter`, '']}
+                contentStyle={chartTooltipStyle}
+                labelStyle={{ fontWeight: 'bold', color: '#cbd5e1', marginBottom: 6 }}
+                itemStyle={{ padding: '2px 0' }}
+              />
+              <Legend
+                iconType="circle"
+                wrapperStyle={{ paddingTop: '12px', fontSize: '12px' }}
+              />
+              <Bar
+                dataKey="fuelLiters"
+                name="Volume BBM"
+                fill="#0ea5e9"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={48}
+                animationDuration={1200}
+                animationEasing="ease-out"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      {/* ═══════════════════════ 6. FUEL EFFICIENCY & CONSUMPTION TREND ═══════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 mt-4 md:mt-5">
         {/* ── Fuel Efficiency & Consumption Trend Chart (2 columns) ── */}
         <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-sm lg:col-span-2">
           <div className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

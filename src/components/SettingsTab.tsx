@@ -5,7 +5,7 @@ import { sendTelegramNotification } from '../utils/telegram';
 import {
   Settings, Database, Send, Calendar, Milestone, Moon, Sun, Eye, EyeOff,
   Clipboard, Check, ShieldCheck, HelpCircle, LogIn, LogOut, RefreshCw, AlertTriangle,
-  Download
+  Download, Save
 } from 'lucide-react';
 
 interface SettingsTabProps {
@@ -268,14 +268,25 @@ export default function SettingsTab({
 
       {/* 2. Oil Intervals Configurations (user limit setting) */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
-        <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-          <Calendar className="w-5 h-5 text-indigo-500" /> Interval Penjadwalan Ganti Oli
-        </h3>
+        <div className="flex items-center justify-between mb-4 border-b border-slate-50 dark:border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-indigo-500" /> Ganti Oli
+          </h3>
+          <button
+            id="btn-save-intervals"
+            type="button"
+            onClick={handleSaveIntervals}
+            className="p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer"
+            title="Simpan Pengaturan"
+          >
+            <Save className="w-5 h-5" />
+          </button>
+        </div>
 
-        <form onSubmit={handleSaveIntervals} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <form className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Interval Berdasarkan Jarak (Kilometer)
+              Berdasarkan Jarak (km)
             </label>
             <div className="relative">
               <input
@@ -284,19 +295,19 @@ export default function SettingsTab({
                 required
                 value={intervalKm}
                 onChange={(e) => setIntervalKm(Number(e.target.value))}
-                placeholder="Contoh: 2000"
+                placeholder="Contoh: 1000"
                 className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold"
               />
               <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-sm font-bold text-slate-400 pointer-events-none">
                 KM
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5">Rekomendasi umum ganti oli motor adalah setiap <b>2.000 km - 3.000 km</b>.</p>
+            <p className="text-[12px] text-slate-400 mt-1.5">Rekomendasi umum ganti oli motor adalah setiap <b>1.000 km - 3.000 km</b>.</p>
           </div>
 
           <div>
             <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Interval Berdasarkan Waktu (Hari)
+              Berdasarkan Waktu (Hari)
             </label>
             <div className="relative">
               <input
@@ -333,17 +344,7 @@ export default function SettingsTab({
                 Rp/L
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5">Digunakan untuk <b>konversi otomatis rupiah ke liter</b> saat catat BBM (Default Pertalite: Rp 10.000/L).</p>
-          </div>
-
-          <div className="md:col-span-3 flex justify-end">
-            <button
-              id="btn-save-intervals"
-              type="submit"
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer"
-            >
-              Simpan Pengaturan
-            </button>
+            <p className="text-[12px] text-slate-400 mt-1.5"> (Default Pertalite: Rp 10.000/L).</p>
           </div>
         </form>
       </div>
@@ -351,11 +352,8 @@ export default function SettingsTab({
       {/* 2.5 Backup & Data Export Card */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
         <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-          <Download className="w-5 h-5 text-indigo-500" /> Cadangan & Ekspor Data
+          <Download className="w-5 h-5 text-indigo-500" /> BackUp Data
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-          Amankan data Anda secara mandiri. Unduh seluruh riwayat ganti oli dan catatan konsumsi bahan bakar (BBM) Anda dalam format file JSON. File cadangan ini dapat Anda simpan secara lokal sebagai tindakan pencegahan kehilangan data jika terjadi kegagalan sistem atau penghapusan cache browser.
-        </p>
 
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/60">
           <div className="space-y-1">
@@ -370,7 +368,7 @@ export default function SettingsTab({
             onClick={handleDownloadBackup}
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs self-stretch sm:self-auto justify-center"
           >
-            <Download className="w-4 h-4" /> Download Cadangan (JSON)
+            <Download className="w-4 h-4" /> Download JSON
           </button>
         </div>
       </div>
@@ -379,13 +377,13 @@ export default function SettingsTab({
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs space-y-6">
         <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
           <span className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-500" /> Sinkronisasi Database Supabase (Real-Time)
+            <Database className="w-5 h-5 text-indigo-500" /> Sinkronisasi
           </span>
           <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${settings.supabase.connected
             ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
             : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
             }`}>
-            {settings.supabase.connected ? 'Supabase' : 'Offline'}
+            {settings.supabase.connected ? 'Supa' : 'Offline'}
           </span>
         </h3>
 
@@ -673,7 +671,7 @@ export default function SettingsTab({
         <RefreshCw className="w-5 h-5" />
       </div>
       <div>
-        <h3 className="text-base font-bold text-slate-900 dark:text-white">Pembaruan Otomatis Aplikasi (APK & PWA)</h3>
+        <h3 className="text-base font-bold text-slate-900 dark:text-white">Pembaruan Otomatis (APK & PWA)</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400">Pembaruan otomatis tanpa perlu uninstall aplikasi lama</p>
       </div>
     </div>
@@ -682,7 +680,7 @@ export default function SettingsTab({
       <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
         <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
         <div>
-          <span className="font-semibold block mb-0.5">Sistem Pembaruan Latar Belakang (Network-First) Aktif:</span>
+          <span className="font-semibold block mb-0.5">Pembaruan Latar Belakang Aktif:</span>
           Aplikasi terpasang (PWA / Web-APK) secara otomatis mengambil file dan fitur terbaru dari server tanpa menghapus data lokal atau perlu uninstall APK lama.
         </div>
       </div>
