@@ -239,35 +239,7 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
       </motion.div>
 
       {/* ════════════════════ 2. FILTERS BAR ════════════════════ */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div className="relative md:col-span-2">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search className="w-4 h-4" />
-          </div>
-          <input
-            id="oil-search"
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari merek oli, tipe, atau catatan..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm transition-all shadow-xs"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 px-3 py-2 shadow-xs">
-          <ListFilter className="w-4 h-4 text-indigo-500 shrink-0" />
-          <select
-            id="oil-brand-filter"
-            value={brandFilter}
-            onChange={(e) => setBrandFilter(e.target.value)}
-            className="flex-1 bg-transparent text-slate-800 dark:text-white text-sm focus:outline-hidden"
-          >
-            {uniqueBrands.map(brand => (
-              <option key={brand} value={brand}>{brand}</option>
-            ))}
-          </select>
-        </div>
-
+      <motion.div variants={fadeUp} className="flex justify-end gap-3">
         <motion.button
           whileTap={{ scale: 0.97 }}
           id="oil-sort-toggle"
