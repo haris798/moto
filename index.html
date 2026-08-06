@@ -35,11 +35,11 @@
             .then((reg) => {
               console.log('Service Worker terdaftar:', reg.scope);
               
-              // Check for update on load and when tab gets focus
-              reg.update();
+              // Check for update on load and when tab gets focus (safely handle network errors)
+              reg.update().catch(() => {});
               document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible') {
-                  reg.update();
+                  reg.update().catch(() => {});
                 }
               });
 

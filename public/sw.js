@@ -10,12 +10,18 @@ const ASSETS_TO_CACHE = [
   '/screenshot_desktop.jpg'
 ];
 
-// Install event: cache core assets and skip waiting immediately
+// Install event: cache core assets safely and skip waiting immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const asset of ASSETS_TO_CACHE) {
+        try {
+          await cache.add(asset);
+        } catch (e) {
+          console.warn('[SW] Failed to cache asset:', asset, e);
+        }
+      }
     })
   );
 });

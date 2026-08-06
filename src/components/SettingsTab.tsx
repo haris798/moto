@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AppSettings, SyncStatus, OilLog, FuelLog } from '../types';
 import { testSupabaseConnection, SUPABASE_SQL_SCRIPT, getSupabaseClient } from '../lib/supabaseClient';
+import { setDBItem } from '../lib/dbStorage';
 import { sendTelegramNotification } from '../utils/telegram';
 import {
   Settings, Database, Send, Calendar, Milestone, Moon, Sun, Eye, EyeOff,
@@ -71,7 +72,11 @@ export default function SettingsTab({
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
-          await reg.update();
+          try {
+            await reg.update();
+          } catch (e) {
+            console.warn('[SW] Service worker update skipped:', e);
+          }
         }
         if ('caches' in window) {
           const cacheNames = await caches.keys();
@@ -136,11 +141,11 @@ export default function SettingsTab({
           connected: true
         }
       });
-      // Save to localStorage immediately so Supabase client loads it
-      localStorage.setItem('supabase_url', supabaseUrl.trim());
-      localStorage.setItem('supabase_anon_key', supabaseKey.trim());
-      localStorage.setItem('supabase_email', authEmail.trim());
-      localStorage.setItem('supabase_password', authPassword.trim());
+      // Save to IndexedDB storage immediately so Supabase client loads it
+      await setDBItem('supabase_url', supabaseUrl.trim());
+      await setDBItem('supabase_anon_key', supabaseKey.trim());
+      await setDBItem('supabase_email', authEmail.trim());
+      await setDBItem('supabase_password', authPassword.trim());
 
       // Attempt login if email and password are provided
       if (authEmail.trim() && authPassword.trim()) {

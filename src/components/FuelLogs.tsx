@@ -6,8 +6,8 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
 import {
-  Plus, Trash2, Edit3, Calendar, Search, Fuel, X, ArrowUpDown, AlertCircle, Sparkles,
-  TrendingUp, Droplets, DollarSign, Gauge, ListFilter, Clock, Satellite, Save
+  Plus, Trash2, Edit3, Calendar, Fuel, X, ArrowUpDown, AlertCircle, Sparkles,
+  TrendingUp, Droplets, DollarSign, Gauge, Clock, Satellite, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -83,9 +83,7 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
   const [formError, setFormError] = useState<string | null>(null);
   const [effCalculating, setEffCalculating] = useState(false); // Status kalkulasi efisiensi
   
-  // State lokal untuk pencarian, filter jenis bahan bakar, dan urutan
-  const [searchQuery, setSearchQuery] = useState('');
-  const [fuelTypeFilter, setFuelTypeFilter] = useState('All');
+  // State lokal untuk urutan
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const resetForm = () => {
@@ -199,19 +197,12 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
     setIsFormOpen(false);
   };
 
-  // Filtering & Sorting
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch = log.fuel_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (log.notes || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = fuelTypeFilter === 'All' || log.fuel_type === fuelTypeFilter;
-    return matchesSearch && matchesType;
-  });
-  const sortedLogs = [...filteredLogs].sort((a, b) => {
+  // Sorting
+  const sortedLogs = [...logs].sort((a, b) => {
     const tA = new Date(a.date).getTime();
     const tB = new Date(b.date).getTime();
     return sortOrder === 'desc' ? tB - tA : tA - tB;
   });
-  const uniqueFuelTypes = ['All', ...Array.from(new Set(logs.map(l => l.fuel_type)))];
 
   // Group logs by month
   const groupedLogs = useMemo(() => {
@@ -345,11 +336,8 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
               <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
                 <TrendingUp className="w-4 h-4" />
               </div>
-              Grafik Tren Efisiensi Konsumsi BBM (km/L)
+              Efisiensi BBM (km/L)
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Visualisasi perkembangan efisiensi jarak tempuh per liter bahan bakar
-            </p>
           </div>
           {avgEff > 0 && (
             <span className="self-start sm:self-auto text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">

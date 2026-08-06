@@ -2,9 +2,10 @@ import { useState, useMemo, useEffect, type FormEvent } from 'react';
 import { OilLog, AppSettings, Jarak } from '../types';
 import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
+import { getSyncItem, getDBItem } from '../lib/dbStorage';
 import {
-  Plus, Trash2, Edit3, Calendar, Search, Wrench, Star, X, ArrowUpDown, AlertCircle,
-  Droplets, Gauge, DollarSign, Clock, ListFilter, Shield, Award, Save
+  Plus, Trash2, Edit3, Calendar, Wrench, Star, X, ArrowUpDown, AlertCircle,
+  Droplets, Gauge, DollarSign, Clock, Shield, Award, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -41,9 +42,7 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
   const [cost, setCost] = useState<number | ''>('');
   const [formError, setFormError] = useState<string | null>(null);
   
-  // State lokal untuk pencarian, filter, dan urutan
-  const [searchQuery, setSearchQuery] = useState('');
-  const [brandFilter, setBrandFilter] = useState('All');
+  // State lokal untuk urutan
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const resetForm = () => {
@@ -93,21 +92,12 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
     setIsFormOpen(false);
   };
 
-  // Filtering & Sorting
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch =
-      log.oil_brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (log.notes || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.oil_type.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesBrand = brandFilter === 'All' || log.oil_brand.toLowerCase() === brandFilter.toLowerCase();
-    return matchesSearch && matchesBrand;
-  });
-  const sortedLogs = [...filteredLogs].sort((a, b) => {
+  // Sorting
+  const sortedLogs = [...logs].sort((a, b) => {
     const tA = new Date(a.date).getTime();
     const tB = new Date(b.date).getTime();
     return sortOrder === 'desc' ? tB - tA : tA - tB;
   });
-  const uniqueBrands = ['All', ...Array.from(new Set(logs.map(l => l.oil_brand)))];
 
   // Group logs by month
   const groupedLogs = useMemo(() => {
@@ -144,17 +134,15 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
     }));
   }, [sortedLogs]);
 
-  // Jarak tempuh records from local DB & Supabase
+  // Jarak tempuh records from local DB (IndexedDB) & Supabase
   const [jarakRecords, setJarakRecords] = useState<Jarak[]>(() => {
-    try {
-      const cached = localStorage.getItem('oil_tracker_jarak');
-      return cached ? JSON.parse(cached) : [];
-    } catch {
-      return [];
-    }
+    return getSyncItem<Jarak[]>('oil_tracker_jarak', []);
   });
 
   useEffect(() => {
+    getDBItem<Jarak[]>('oil_tracker_jarak', []).then(cached => {
+      if (cached && cached.length > 0) setJarakRecords(cached);
+    });
     fetchJarakRecords().then(({ records }) => {
       if (records && records.length > 0) {
         setJarakRecords(records);
@@ -223,7 +211,7 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
             {[
               { icon: Droplets, label: 'Total Servis', value: `${logs.length}x ganti` },
               { icon: DollarSign, label: 'Total Biaya', value: formatIDR(totalOilCost) },
-              { icon: Shield, label: 'Merek Populer', value: uniqueBrands.filter(b => b !== 'All').length > 0 ? uniqueBrands.filter(b => b !== 'All')[0] : '-' },
+              { icon: Shield, label: 'Merek Populer', value: logs.length > 0 ? logs[0].oil_brand : '-' },
               { icon: Gauge, label: 'Jarak Terakhir', value: `${distanceSinceLastOil.toLocaleString('id-ID')} km` },
             ].map((item, i) => (
               <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10">

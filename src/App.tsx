@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { OilLog, FuelLog, ServiceLog, AppSettings, SyncStatus } from './types';
 import { getSupabaseClient, syncWithSupabase } from './lib/supabaseClient';
+import { initIndexedDB, getDBItem, setDBItem, removeDBItem } from './lib/dbStorage';
 import { checkAndSendOilAlert } from './utils/telegram';
 import { exportToCSV, exportToPDF } from './utils/export';
 import { generateUUID } from './utils/uuid';
@@ -52,7 +53,6 @@ export default function App() {
     pendingSyncCount: 0,
     isSyncing: false,
   });
-  const [syncProgressMsg, setSyncProgressMsg] = useState<string>('');
 
   const tabsList = [
     { id: 'dashboard', label: 'Dashboard', icon: Gauge },
@@ -63,62 +63,49 @@ export default function App() {
   ];
 
   // 2. Inisialisasi Data pada saat komponen dimuat (Mount)
-  // Memuat pengaturan dan log yang tersimpan di localStorage (Offline-First)
+  // Memuat pengaturan dan log yang tersimpan di IndexedDB (Offline-First)
   useEffect(() => {
-    // A. Memuat pengaturan lokal
-    const cachedSettings = localStorage.getItem('oil_tracker_settings');
-    let loadedSettings = DEFAULT_SETTINGS;
-    if (cachedSettings) {
-      try {
-        const parsed = JSON.parse(cachedSettings);
-        loadedSettings = { ...DEFAULT_SETTINGS, ...parsed };
+    async function loadInitialData() {
+      await initIndexedDB();
+
+      // A. Memuat pengaturan lokal
+      const cachedSettings = await getDBItem<AppSettings | null>('oil_tracker_settings', null);
+      let loadedSettings = DEFAULT_SETTINGS;
+      if (cachedSettings) {
+        loadedSettings = { ...DEFAULT_SETTINGS, ...cachedSettings };
         setSettings(loadedSettings);
-      } catch (e) {
-        console.error('Error loading settings from cache', e);
       }
-    }
 
-    // B. Memuat Riwayat Oli, BBM, dan Servis
-    const cachedOil = localStorage.getItem('oil_tracker_oil_logs');
-    if (cachedOil) {
-      try {
-        setOilLogs(JSON.parse(cachedOil));
-      } catch (e) { }
-    }
+      // B. Memuat Riwayat Oli, BBM, dan Servis
+      const cachedOil = await getDBItem<OilLog[]>('oil_tracker_oil_logs', []);
+      setOilLogs(cachedOil);
 
-    const cachedFuel = localStorage.getItem('oil_tracker_fuel_logs');
-    if (cachedFuel) {
-      try {
-        setFuelLogs(JSON.parse(cachedFuel));
-      } catch (e) { }
-    }
+      const cachedFuel = await getDBItem<FuelLog[]>('oil_tracker_fuel_logs', []);
+      setFuelLogs(cachedFuel);
 
-    const cachedService = localStorage.getItem('oil_tracker_service_logs');
-    if (cachedService) {
-      try {
-        setServiceLogs(JSON.parse(cachedService));
-      } catch (e) { }
-    }
+      const cachedService = await getDBItem<ServiceLog[]>('oil_tracker_service_logs', []);
+      setServiceLogs(cachedService);
 
-    // C. Konfigurasi Tema (Terang/Gelap)
-    const isDark = loadedSettings.theme === 'dark' || localStorage.getItem('oil_tracker_theme') === 'dark';
-    setDarkMode(isDark);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+      // C. Konfigurasi Tema (Terang/Gelap)
+      const themeVal = await getDBItem<string>('oil_tracker_theme', 'light');
+      const isDark = loadedSettings.theme === 'dark' || themeVal === 'dark';
+      setDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
 
-    // D. Mengecek sesi pengguna di Supabase jika sudah login
-    const client = getSupabaseClient();
-    if (client) {
-      client.auth.getUser().then(async ({ data: { user: sbUser } }) => {
+      // D. Mengecek sesi pengguna di Supabase jika sudah login
+      const client = getSupabaseClient();
+      if (client) {
+        const { data: { user: sbUser } } = await client.auth.getUser();
         if (sbUser) {
           setUser(sbUser);
         } else {
           // Auto-login using saved credentials if available
-          const savedEmail = localStorage.getItem('supabase_email');
-          const savedPassword = localStorage.getItem('supabase_password');
+          const savedEmail = await getDBItem<string>('supabase_email', '');
+          const savedPassword = await getDBItem<string>('supabase_password', '');
 
           if (savedEmail && savedPassword) {
             try {
@@ -136,9 +123,13 @@ export default function App() {
             }
           }
         }
-      });
+      }
+    }
 
-      // Listen for auth state changes
+    loadInitialData();
+
+    const client = getSupabaseClient();
+    if (client) {
       const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
         if (session?.user) {
           setUser(session.user);
@@ -155,15 +146,12 @@ export default function App() {
 
   // Update pending sync count whenever logs change or deletions are queued
   useEffect(() => {
-    let deletedIds: string[] = [];
-    try {
-      const parsed = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
-      if (Array.isArray(parsed)) deletedIds = parsed;
-    } catch (e) {}
-    setSyncStatus(prev => ({
-      ...prev,
-      pendingSyncCount: deletedIds.length
-    }));
+    getDBItem<string[]>('deleted_log_ids', []).then(deletedIds => {
+      setSyncStatus(prev => ({
+        ...prev,
+        pendingSyncCount: Array.isArray(deletedIds) ? deletedIds.length : 0
+      }));
+    });
   }, [oilLogs, fuelLogs]);
 
   // 3. Listener Status Jaringan (Online/Offline)
@@ -216,54 +204,58 @@ export default function App() {
             }
           };
           setSettings(updated);
-          localStorage.setItem('oil_tracker_settings', JSON.stringify(updated));
+          setDBItem('oil_tracker_settings', updated);
         }
       });
     }
   }, [oilLogs, fuelLogs, settings.telegram.enabled]);
 
   // 5. Global Actions
-  const handleUpdateSettings = useCallback((newSettings: AppSettings) => {
+  const handleUpdateSettings = useCallback(async (newSettings: AppSettings) => {
     setSettings(newSettings);
-    localStorage.setItem('oil_tracker_settings', JSON.stringify(newSettings));
+    await setDBItem('oil_tracker_settings', newSettings);
 
     // Also save credentials directly for client initialization helper
     if (newSettings.supabase.url && newSettings.supabase.anonKey) {
-      localStorage.setItem('supabase_url', newSettings.supabase.url);
-      localStorage.setItem('supabase_anon_key', newSettings.supabase.anonKey);
+      await setDBItem('supabase_url', newSettings.supabase.url);
+      await setDBItem('supabase_anon_key', newSettings.supabase.anonKey);
     }
   }, []);
 
-  const handleToggleDarkMode = useCallback(() => {
+  const handleToggleDarkMode = useCallback(async () => {
     setDarkMode(prev => {
       const nextDark = !prev;
       if (nextDark) {
         document.documentElement.classList.add('dark');
-        localStorage.setItem('oil_tracker_theme', 'dark');
+        setDBItem('oil_tracker_theme', 'dark');
       } else {
         document.documentElement.classList.remove('dark');
-        localStorage.setItem('oil_tracker_theme', 'light');
+        setDBItem('oil_tracker_theme', 'light');
       }
       return nextDark;
     });
   }, []);
 
   // Perform full database cloud sync
-  const handleTriggerSync = useCallback(async (customOilLogs?: OilLog[], customFuelLogs?: FuelLog[], customServiceLogs?: ServiceLog[]) => {
+  const handleTriggerSync = useCallback(async (
+    customOilLogs?: OilLog[],
+    customFuelLogs?: FuelLog[],
+    customServiceLogs?: ServiceLog[],
+    isInteractive: boolean = false
+  ) => {
     if (!isOnline) {
-      alert('Tidak ada koneksi internet. Sinkronisasi ditunda.');
+      if (isInteractive) {
+        alert('Tidak ada koneksi internet. Sinkronisasi ditunda.');
+      }
       return;
     }
     setSyncStatus(prev => ({ ...prev, isSyncing: true }));
-    setSyncProgressMsg('Menghubungkan ke Supabase...');
 
     try {
       const logsToSyncOil = customOilLogs || oilLogs;
       const logsToSyncFuel = customFuelLogs || fuelLogs;
       const logsToSyncService = customServiceLogs || serviceLogs;
-      const result = await syncWithSupabase(logsToSyncOil, logsToSyncFuel, (progress) => {
-        setSyncProgressMsg(progress);
-      }, logsToSyncService);
+      const result = await syncWithSupabase(logsToSyncOil, logsToSyncFuel, undefined, logsToSyncService);
 
       if (result.success) {
         // Update local logs with merged data
@@ -271,31 +263,31 @@ export default function App() {
         setFuelLogs(result.syncedFuelLogs);
         if (result.syncedServiceLogs) {
           setServiceLogs(result.syncedServiceLogs);
-          localStorage.setItem('oil_tracker_service_logs', JSON.stringify(result.syncedServiceLogs));
+          await setDBItem('oil_tracker_service_logs', result.syncedServiceLogs);
         }
         if (result.syncedJarakRecords) {
-          localStorage.setItem('oil_tracker_jarak', JSON.stringify(result.syncedJarakRecords));
+          await setDBItem('oil_tracker_jarak', result.syncedJarakRecords);
         }
 
-        localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(result.syncedOilLogs));
-        localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(result.syncedFuelLogs));
+        await setDBItem('oil_tracker_oil_logs', result.syncedOilLogs);
+        await setDBItem('oil_tracker_fuel_logs', result.syncedFuelLogs);
 
         setSyncStatus({
           lastSyncedAt: new Date().toISOString(),
           pendingSyncCount: 0,
           isSyncing: false
         });
-        setSyncProgressMsg('Sinkronisasi selesai!');
-        setTimeout(() => setSyncProgressMsg(''), 3000);
       } else {
         setSyncStatus(prev => ({ ...prev, isSyncing: false }));
-        setSyncProgressMsg('');
-        alert(result.message);
+        if (isInteractive) {
+          alert(result.message);
+        }
       }
     } catch (e: any) {
       setSyncStatus(prev => ({ ...prev, isSyncing: false }));
-      setSyncProgressMsg('');
-      alert(`Gagal sinkronisasi: ${e.message || e}`);
+      if (isInteractive) {
+        alert(`Gagal sinkronisasi: ${e.message || e}`);
+      }
     }
   }, [isOnline, oilLogs, fuelLogs, serviceLogs, settings.supabase.connected]);
 
@@ -310,15 +302,15 @@ export default function App() {
         supabase: { url: '', anonKey: '', connected: false }
       };
       setSettings(clearedSettings);
-      localStorage.removeItem('supabase_url');
-      localStorage.removeItem('supabase_anon_key');
-      localStorage.setItem('oil_tracker_settings', JSON.stringify(clearedSettings));
+      await removeDBItem('supabase_url');
+      await removeDBItem('supabase_anon_key');
+      await setDBItem('oil_tracker_settings', clearedSettings);
       alert('Anda telah keluar dari akun cloud.');
     }
   };
 
   // Log handlers
-  const handleAddOilLog = (logData: Omit<OilLog, 'id'>) => {
+  const handleAddOilLog = async (logData: Omit<OilLog, 'id'>) => {
     const newLog: OilLog = {
       ...logData,
       id: generateUUID(),
@@ -327,14 +319,14 @@ export default function App() {
     };
     const updated = [newLog, ...oilLogs];
     setOilLogs(updated);
-    localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_oil_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(updated, undefined);
     }
   };
 
-  const handleEditOilLog = (id: string, updatedData: Partial<OilLog>) => {
+  const handleEditOilLog = async (id: string, updatedData: Partial<OilLog>) => {
     const updated = oilLogs.map(log => {
       if (log.id === id) {
         return {
@@ -346,29 +338,29 @@ export default function App() {
       return log;
     });
     setOilLogs(updated);
-    localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_oil_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(updated, undefined);
     }
   };
 
-  const handleDeleteOilLog = (id: string) => {
+  const handleDeleteOilLog = async (id: string) => {
     const updated = oilLogs.filter(log => log.id !== id);
     setOilLogs(updated);
-    localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_oil_logs', updated);
 
     // Queue deletion id
-    const deletedIds: string[] = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
+    const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
-    localStorage.setItem('deleted_log_ids', JSON.stringify(deletedIds));
+    await setDBItem('deleted_log_ids', deletedIds);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(updated, undefined);
     }
   };
 
-  const handleAddFuelLog = (logData: Omit<FuelLog, 'id'>) => {
+  const handleAddFuelLog = async (logData: Omit<FuelLog, 'id'>) => {
     const newLog: FuelLog = {
       ...logData,
       id: generateUUID(),
@@ -377,14 +369,14 @@ export default function App() {
     };
     const updated = [newLog, ...fuelLogs];
     setFuelLogs(updated);
-    localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_fuel_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, updated);
     }
   };
 
-  const handleEditFuelLog = (id: string, updatedData: Partial<FuelLog>) => {
+  const handleEditFuelLog = async (id: string, updatedData: Partial<FuelLog>) => {
     const updated = fuelLogs.map(log => {
       if (log.id === id) {
         return {
@@ -396,29 +388,29 @@ export default function App() {
       return log;
     });
     setFuelLogs(updated);
-    localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_fuel_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, updated);
     }
   };
 
-  const handleDeleteFuelLog = (id: string) => {
+  const handleDeleteFuelLog = async (id: string) => {
     const updated = fuelLogs.filter(log => log.id !== id);
     setFuelLogs(updated);
-    localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_fuel_logs', updated);
 
     // Queue deletion id
-    const deletedIds: string[] = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
+    const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
-    localStorage.setItem('deleted_log_ids', JSON.stringify(deletedIds));
+    await setDBItem('deleted_log_ids', deletedIds);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, updated);
     }
   };
 
-  const handleAddServiceLog = (logData: Omit<ServiceLog, 'id'>) => {
+  const handleAddServiceLog = async (logData: Omit<ServiceLog, 'id'>) => {
     const newLog: ServiceLog = {
       ...logData,
       id: generateUUID(),
@@ -427,14 +419,14 @@ export default function App() {
     };
     const updated = [newLog, ...serviceLogs];
     setServiceLogs(updated);
-    localStorage.setItem('oil_tracker_service_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_service_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, undefined, updated);
     }
   };
 
-  const handleEditServiceLog = (id: string, updatedData: Partial<ServiceLog>) => {
+  const handleEditServiceLog = async (id: string, updatedData: Partial<ServiceLog>) => {
     const updated = serviceLogs.map(log => {
       if (log.id === id) {
         return {
@@ -446,22 +438,22 @@ export default function App() {
       return log;
     });
     setServiceLogs(updated);
-    localStorage.setItem('oil_tracker_service_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_service_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, undefined, updated);
     }
   };
 
-  const handleDeleteServiceLog = (id: string) => {
+  const handleDeleteServiceLog = async (id: string) => {
     const updated = serviceLogs.filter(log => log.id !== id);
     setServiceLogs(updated);
-    localStorage.setItem('oil_tracker_service_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_service_logs', updated);
 
     // Queue deletion id
-    const deletedIds: string[] = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
+    const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
-    localStorage.setItem('deleted_log_ids', JSON.stringify(deletedIds));
+    await setDBItem('deleted_log_ids', deletedIds);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, undefined, updated);
@@ -549,7 +541,7 @@ export default function App() {
 
             {settings.supabase.connected && user && (
               <button
-                onClick={handleTriggerSync}
+                onClick={() => handleTriggerSync(undefined, undefined, undefined, true)}
                 disabled={syncStatus.isSyncing || !isOnline}
                 className="mt-2.5 w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
@@ -711,14 +703,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Sync Progress Indicator Banner */}
-        {syncProgressMsg && (
-          <div className="w-full bg-indigo-600 text-white text-center py-2 text-sm font-bold animate-pulse flex items-center justify-center gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            <span>{syncProgressMsg}</span>
-          </div>
-        )}
-
         {/* 3. Main Stage Container */}
         <main className="flex-1 p-6 sm:p-8 pb-28 md:pb-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-6">
           {activeTab === 'dashboard' && (
@@ -775,7 +759,7 @@ export default function App() {
               oilLogs={oilLogs}
               fuelLogs={fuelLogs}
               onUpdateSettings={handleUpdateSettings}
-              onTriggerSync={handleTriggerSync}
+              onTriggerSync={() => handleTriggerSync(undefined, undefined, undefined, true)}
               onOpenAuth={() => setActiveTab('settings')}
               onLogout={handleLogout}
             />

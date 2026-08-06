@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { OilLog, FuelLog, AppSettings, Jarak, ServiceLog } from '../types';
 import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
+import { getDBItem, setDBItem } from '../lib/dbStorage';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   LineChart, Line, AreaChart, Area, ComposedChart
@@ -225,14 +226,11 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const [jarakLoading, setJarakLoading] = useState(false);
 
   const loadJarak = async () => {
-    // 1. Load from local DB (localStorage) immediately
+    // 1. Load from local DB (IndexedDB) immediately
     try {
-      const cached = localStorage.getItem('oil_tracker_jarak');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setJarakData(parsed);
-        }
+      const cached = await getDBItem<Jarak[]>('oil_tracker_jarak', []);
+      if (Array.isArray(cached) && cached.length > 0) {
+        setJarakData(cached);
       }
     } catch { /* ignore */ }
 
@@ -242,7 +240,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
       const { records, error } = await fetchJarakRecords();
       if (!error && Array.isArray(records)) {
         setJarakData(records);
-        localStorage.setItem('oil_tracker_jarak', JSON.stringify(records));
+        await setDBItem('oil_tracker_jarak', records);
       }
     } catch { /* ignore */ }
     finally { setJarakLoading(false); }

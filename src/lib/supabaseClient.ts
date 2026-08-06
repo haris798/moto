@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { OilLog, FuelLog, ServiceLog, Jarak } from '../types';
+import { getDBItem, setDBItem, getSyncItem } from './dbStorage';
 
 let supabaseInstance: SupabaseClient | null = null;
 let currentUrl = '';
@@ -7,12 +8,12 @@ let currentKey = '';
 
 // Mengelola inisialisasi dan pengambilan instance dari Supabase Client
 export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClient | null {
-  // Try to load from provided args or localStorage
+  // Try to load from provided args or IndexedDB/local storage
   const defaultUrl = 'https://pcoyvfhcniscynjkndlw.supabase.co';
   const defaultKey = 'sb_publishable_4HYaHZhOIECG56Eccpe4sA_xj-Ecy9n';
 
-  const finalUrl = url || localStorage.getItem('supabase_url') || defaultUrl;
-  const finalKey = anonKey || localStorage.getItem('supabase_anon_key') || defaultKey;
+  const finalUrl = url || getSyncItem('supabase_url', defaultUrl);
+  const finalKey = anonKey || getSyncItem('supabase_anon_key', defaultKey);
 
   if (!finalUrl || !finalKey) {
     supabaseInstance = null;
@@ -77,8 +78,8 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
 export async function syncWithSupabase(
   localOilLogs: OilLog[],
   localFuelLogs: FuelLog[],
-  onSyncProgress: (status: string) => void,
-  localServiceLogs: ServiceLog[] = []
+  progressOrServiceLogs?: ((status: string) => void) | ServiceLog[],
+  localServiceLogsArg: ServiceLog[] = []
 ): Promise<{
   syncedOilLogs: OilLog[];
   syncedFuelLogs: FuelLog[];
@@ -87,6 +88,25 @@ export async function syncWithSupabase(
   success: boolean;
   message: string;
 }> {
+  let progressFn: ((status: string) => void) | undefined;
+  let localServiceLogs: ServiceLog[] = Array.isArray(localServiceLogsArg) ? localServiceLogsArg : [];
+
+  if (typeof progressOrServiceLogs === 'function') {
+    progressFn = progressOrServiceLogs;
+  } else if (Array.isArray(progressOrServiceLogs)) {
+    localServiceLogs = progressOrServiceLogs;
+  }
+
+  const reportProgress = (status: string) => {
+    if (typeof progressFn === 'function') {
+      try {
+        progressFn(status);
+      } catch {
+        // ignore progress callback errors
+      }
+    }
+  };
+
   const client = getSupabaseClient();
   if (!client) {
     return { syncedOilLogs: localOilLogs, syncedFuelLogs: localFuelLogs, syncedServiceLogs: localServiceLogs, success: false, message: 'Supabase belum dikonfigurasi.' };
@@ -99,18 +119,17 @@ export async function syncWithSupabase(
     }
 
     const userId = user.id;
-    onSyncProgress('Sinkronisasi dimulai...');
+    reportProgress('Sinkronisasi dimulai...');
 
     // 1. Process deletions
     let deletedIds: string[] = [];
     try {
-      const parsed = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
-      if (Array.isArray(parsed)) deletedIds = parsed;
+      deletedIds = await getDBItem<string[]>('deleted_log_ids', []);
     } catch (e) {
       // ignore
     }
     if (deletedIds.length > 0) {
-      onSyncProgress('Menghapus data yang didelete saat offline...');
+      reportProgress('Menghapus data yang didelete saat offline...');
       // Delete oil logs
       await client.from('oil_logs').delete().in('id', deletedIds).eq('user_id', userId);
       // Delete fuel logs
@@ -118,18 +137,23 @@ export async function syncWithSupabase(
       // Delete service logs
       await client.from('service_logs').delete().in('id', deletedIds).eq('user_id', userId);
       // Clear local deletion log
-      localStorage.setItem('deleted_log_ids', '[]');
+      await setDBItem('deleted_log_ids', []);
     }
 
     // 2. Sync Oil Logs
-    onSyncProgress('Sinkronisasi riwayat ganti oli...');
+    reportProgress('Sinkronisasi riwayat ganti oli...');
     // Fetch remote oil logs
     const { data: remoteOilLogs, error: oilError } = await client
       .from('oil_logs')
       .select('*')
       .eq('user_id', userId);
 
-    if (oilError) throw new Error(`Gagal fetch oli: ${oilError.message}`);
+    if (oilError) {
+      if (oilError.code === '42P01') {
+        throw new Error('Tabel oil_logs belum ada di Supabase. Silakan jalankan script SQL pada tab Pengaturan.');
+      }
+      throw new Error(oilError.message || 'Gagal mengambil data ganti oli dari Supabase.');
+    }
 
     const safeRemoteOilLogs = Array.isArray(remoteOilLogs) ? remoteOilLogs : [];
     const safeLocalOilLogs = Array.isArray(localOilLogs) ? localOilLogs : [];
@@ -223,14 +247,19 @@ export async function syncWithSupabase(
     }
 
     // 3. Sync Fuel Logs
-    onSyncProgress('Sinkronisasi riwayat pembelian BBM...');
+    reportProgress('Sinkronisasi riwayat pembelian BBM...');
     // Fetch remote fuel logs
     const { data: remoteFuelLogs, error: fuelError } = await client
       .from('fuel_logs')
       .select('*')
       .eq('user_id', userId);
 
-    if (fuelError) throw new Error(`Gagal fetch BBM: ${fuelError.message}`);
+    if (fuelError) {
+      if (fuelError.code === '42P01') {
+        throw new Error('Tabel fuel_logs belum ada di Supabase. Silakan jalankan script SQL pada tab Pengaturan.');
+      }
+      throw new Error(fuelError.message || 'Gagal mengambil data BBM dari Supabase.');
+    }
 
     const safeRemoteFuelLogs = Array.isArray(remoteFuelLogs) ? remoteFuelLogs : [];
     const safeLocalFuelLogs = Array.isArray(localFuelLogs) ? localFuelLogs : [];
@@ -335,7 +364,7 @@ export async function syncWithSupabase(
     }
 
     // 4. Sync Service Logs
-    onSyncProgress('Sinkronisasi riwayat servis & sparepart...');
+    reportProgress('Sinkronisasi riwayat servis & sparepart...');
     const { data: remoteServiceLogs, error: serviceError } = await client
       .from('service_logs')
       .select('*')
@@ -428,11 +457,10 @@ export async function syncWithSupabase(
     mergedServiceLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // 5. Sync Jarak Tempuh (total_km)
-    onSyncProgress('Sinkronisasi data jarak tempuh (total_km)...');
+    reportProgress('Sinkronisasi data jarak tempuh (total_km)...');
     let localJarakRecords: Jarak[] = [];
     try {
-      const cachedJarak = localStorage.getItem('oil_tracker_jarak');
-      if (cachedJarak) localJarakRecords = JSON.parse(cachedJarak);
+      localJarakRecords = await getDBItem<Jarak[]>('oil_tracker_jarak', []);
     } catch (e) {}
 
     const { data: remoteJarakRecords, error: jarakError } = await client
@@ -496,17 +524,16 @@ export async function syncWithSupabase(
     const mergedJarakList = Array.from(mergedJarakMap.values());
     mergedJarakList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // Copy/save hasil jarak (total_km) ke local DB (localStorage)
-    localStorage.setItem('oil_tracker_jarak', JSON.stringify(mergedJarakList));
+    // Copy/save hasil jarak (total_km) ke local DB (IndexedDB)
+    await setDBItem('oil_tracker_jarak', mergedJarakList);
 
     // Update settings in cloud if needed
-    onSyncProgress('Sinkronisasi pengaturan...');
-    const localSettings = localStorage.getItem('oil_tracker_settings');
+    reportProgress('Sinkronisasi pengaturan...');
+    const localSettings = await getDBItem('oil_tracker_settings', null);
     if (localSettings) {
-      const parsedSettings = JSON.parse(localSettings);
       await client.from('user_settings').upsert({
         user_id: userId,
-        settings: parsedSettings,
+        settings: localSettings,
         updated_at: new Date().toISOString()
       });
     }
@@ -521,12 +548,16 @@ export async function syncWithSupabase(
     };
   } catch (error: any) {
     console.error('Sync failed:', error);
+    let errMsg = error?.message || String(error);
+    if (errMsg.includes('Failed to fetch') || errMsg.includes('TypeError')) {
+      errMsg = 'Koneksi ke Supabase terputus. Periksa koneksi internet atau URL/Anon Key Supabase Anda.';
+    }
     return {
       syncedOilLogs: localOilLogs,
       syncedFuelLogs: localFuelLogs,
       syncedServiceLogs: localServiceLogs,
       success: false,
-      message: `Sinkronisasi gagal: ${error.message || error}`
+      message: `Sinkronisasi gagal: ${errMsg}`
     };
   }
 }
@@ -545,21 +576,15 @@ export async function fetchJarakRecords(): Promise<{
 }> {
   const client = getSupabaseClient();
   if (!client) {
-    const cached = localStorage.getItem('oil_tracker_jarak');
-    if (cached) {
-      try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
-    }
-    return { records: [], error: 'Supabase belum dikonfigurasi.' };
+    const records = await getDBItem<Jarak[]>('oil_tracker_jarak', []);
+    return { records, error: records.length > 0 ? null : 'Supabase belum dikonfigurasi.' };
   }
 
   try {
     const { data: { user }, error: authError } = await client.auth.getUser();
     if (authError || !user) {
-      const cached = localStorage.getItem('oil_tracker_jarak');
-      if (cached) {
-        try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
-      }
-      return { records: [], error: 'Silakan login terlebih dahulu.' };
+      const records = await getDBItem<Jarak[]>('oil_tracker_jarak', []);
+      return { records, error: records.length > 0 ? null : 'Silakan login terlebih dahulu.' };
     }
 
     const { data, error } = await client
@@ -569,24 +594,18 @@ export async function fetchJarakRecords(): Promise<{
       .order('date', { ascending: false });
 
     if (error) {
-      const cached = localStorage.getItem('oil_tracker_jarak');
-      if (cached) {
-        try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
-      }
-      return { records: [], error: `Gagal mengambil jarak tempuh: ${error.message}` };
+      const records = await getDBItem<Jarak[]>('oil_tracker_jarak', []);
+      return { records, error: records.length > 0 ? null : `Gagal mengambil jarak tempuh: ${error.message}` };
     }
 
     const records = (data || []) as Jarak[];
-    // Copy/save hasil fungsi jarak (total_km) ke lokal DB (localStorage)
-    localStorage.setItem('oil_tracker_jarak', JSON.stringify(records));
+    // Copy/save hasil fungsi jarak (total_km) ke lokal DB (IndexedDB)
+    await setDBItem('oil_tracker_jarak', records);
 
     return { records, error: null };
   } catch (err: any) {
-    const cached = localStorage.getItem('oil_tracker_jarak');
-    if (cached) {
-      try { return { records: JSON.parse(cached), error: null }; } catch (e) {}
-    }
-    return { records: [], error: err.message || 'Terjadi kesalahan.' };
+    const records = await getDBItem<Jarak[]>('oil_tracker_jarak', []);
+    return { records, error: err.message || 'Terjadi kesalahan.' };
   }
 }
 

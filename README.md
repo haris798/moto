@@ -1,8 +1,8 @@
 # Motorku Tracker (MOTO-LOG) 🛵⛽
 
-**Motorku Tracker** adalah aplikasi web modern untuk melacak riwayat perawatan motor, jadwal ganti oli, pengisian bahan bakar (BBM), serta menganalisis efisiensi konsumsi BBM kendaraan secara akurat dan real-time.
+**Motorku Tracker** adalah aplikasi web modern (*Progressive Web App*) untuk melacak riwayat perawatan motor, jadwal ganti oli, pengisian bahan bakar (BBM), serta menganalisis efisiensi konsumsi BBM kendaraan secara akurat dan real-time.
 
-Aplikasi ini dirancang dengan pendekatan *Offline-First* serta mendukung sinkronisasi cloud melalui Supabase dan pengiriman notifikasi pengingat servis otomatis via Telegram Bot.
+Aplikasi ini dirancang dengan pendekatan *Offline-First* (IndexedDB/LocalStorage + PWA Service Worker) serta mendukung sinkronisasi otomatis di latar belakang (*silent background sync*) melalui Supabase dan pengiriman notifikasi pengingat servis via Telegram Bot API.
 
 ---
 
@@ -22,15 +22,15 @@ Aplikasi ini dirancang dengan pendekatan *Offline-First* serta mendukung sinkron
 ### 3. ⛽ Log BBM & Analisis Efisiensi Konsumsi
 - Pencatatan tanggal pembelian BBM, jenis bahan bakar (Pertalite, Pertamax, dll), volume (Liter), dan total biaya.
 - Kalkulasi otomatis efisiensi konsumsi BBM dalam satuan **km/Liter**.
-- Grafik interaktif tren efisiensi dan riwayat pembelian BBM.
+- Grafik interaktif **Efisiensi BBM (km/L)** dan riwayat pembelian BBM.
 
 ### 4. 📲 Notifikasi Pengingat Telegram Bot
 - Pengiriman peringatan otomatis langsung ke aplikasi Telegram ketika kendaraan mendekati interval ganti oli (berdasarkan kilometer atau sisa hari).
 - Konfigurasi langsung via tab Pengaturan.
 
-### 5. ☁️ Offline-First & Sinkronisasi Cloud (Supabase)
-- **Offline-First**: Seluruh data tersimpan dengan aman di media penyimpanan lokal browser (`localStorage`) sehingga aplikasi dapat digunakan tanpa koneksi internet.
-- **Supabase Cloud Sync**: Sinkronisasi data otomatis atau manual saat terhubung ke internet untuk pencadangan data antar perangkat.
+### 5. ☁️ Offline-First & Silent Background Sync (Supabase)
+- **Offline-First & PWA**: Seluruh data tersimpan dengan aman di media penyimpanan lokal browser (`IndexedDB` & `localStorage`) dengan dukungan *Service Worker* sehingga aplikasi tetap dapat berjalan tanpa koneksi internet.
+- **Silent Cloud Sync**: Sinkronisasi data ke cloud Supabase berjalan di latar belakang secara otomatis tanpa mengganggu alur kerja pengguna (notifikasi/pop-up diperhalus dan opsi sinkronisasi manual tetap tersedia).
 
 ### 6. 📄 Ekspor & Laporan
 - Ekspor seluruh catatan riwayat ke format **CSV** (dapat dibuka di Microsoft Excel / Google Sheets).
@@ -47,7 +47,8 @@ Aplikasi ini dirancang dengan pendekatan *Offline-First* serta mendukung sinkron
 - **Frontend**: React 19, TypeScript, Vite
 - **Styling**: Tailwind CSS v4, Lucide React (Ikon)
 - **Animasi & Grafik**: Motion (`motion/react`), Recharts
-- **Database & Auth**: Supabase JS Client (`@supabase/supabase-js`)
+- **Database & Auth**: Supabase JS Client (`@supabase/supabase-js`), IndexedDB
+- **PWA & Offline**: Service Worker, Web App Manifest
 - **Utilitas**: Custom UUID, CSV & PDF Generator, Telegram Bot API Integration
 
 ---
@@ -85,6 +86,7 @@ npm run build
 │   │   ├── FuelLogs.tsx         # Manajemen riwayat BBM & efisiensi
 │   │   └── SettingsTab.tsx      # Pengaturan Telegram, Cloud, & Interval
 │   ├── lib/
+│   │   ├── dbStorage.ts         # Penyimpanan lokal IndexedDB (Offline-First)
 │   │   └── supabaseClient.ts    # Klien & logika sinkronisasi Supabase
 │   ├── utils/
 │   │   ├── export.ts            # Logika ekspor file CSV & PDF
@@ -93,6 +95,8 @@ npm run build
 │   ├── types.ts                 # Definisi tipe data & antarmuka TypeScript
 │   ├── App.tsx                  # Komponen utama & manajer state aplikasi
 │   └── main.tsx                 # Entry point Vite
+├── public/
+│   └── sw.js                    # Service Worker untuk PWA caching
 ├── package.json
 └── metadata.json
 ```
@@ -102,3 +106,4 @@ npm run build
 ## 📄 Lisensi
 
 Proyek ini dibuat untuk manajemen dan pelacakan kendaraan pribadi secara independen dan efisien.
+
