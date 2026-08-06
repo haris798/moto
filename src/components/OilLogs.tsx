@@ -4,7 +4,7 @@ import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
 import {
   Plus, Trash2, Edit3, Calendar, Search, Wrench, Star, X, ArrowUpDown, AlertCircle,
-  Droplets, Gauge, DollarSign, Clock, ListFilter, Shield, Award
+  Droplets, Gauge, DollarSign, Clock, ListFilter, Shield, Award, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -202,11 +202,8 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
                 </div>
                 <div>
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
-                    Servis & Ganti Oli
+                    Ganti Oli
                   </h1>
-                  <p className="text-indigo-200/80 dark:text-slate-400 text-sm mt-0.5">
-                    Catat riwayat penggantian oli dan pantau biaya perawatan motor
-                  </p>
                 </div>
               </div>
             </div>
@@ -306,20 +303,31 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
                   <div className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
                     <Wrench className="w-4 h-4" />
                   </div>
-                  {editingId ? 'Edit Catatan Ganti Oli' : 'Tambah Catatan Ganti Oli'}
+                  {editingId ? 'Edit Catatan Ganti Oli' : 'Catat Ganti Oli'}
                 </h3>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  id="close-oil-form"
-                  onClick={resetForm}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </motion.button>
+                <div className="flex items-center gap-2">
+                  <button
+                    id="btn-submit-oil-header"
+                    type="submit"
+                    form="oil-form"
+                    className="p-1.5 text-indigo-600 hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900/40 rounded-lg transition-colors cursor-pointer"
+                    title={editingId ? 'Simpan Perubahan' : 'Simpan Catatan'}
+                  >
+                    <Save className="w-5 h-5" />
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    id="close-oil-form"
+                    onClick={resetForm}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </motion.button>
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <form id="oil-form" onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
                 <AnimatePresence>
                   {formError && (
                     <motion.div
@@ -382,28 +390,6 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
                       );
                     })()}
                   </div>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    id="btn-cancel-oil"
-                    type="button"
-                    onClick={resetForm}
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-sm hover:opacity-80 transition-all cursor-pointer"
-                  >
-                    Batal
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    id="btn-submit-oil"
-                    type="submit"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer shadow-lg shadow-indigo-600/20"
-                  >
-                    {editingId ? 'Simpan Perubahan' : 'Simpan Catatan'}
-                  </motion.button>
                 </div>
               </form>
             </motion.div>

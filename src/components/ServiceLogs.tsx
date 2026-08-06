@@ -4,7 +4,7 @@ import { formatIDR } from '../utils/export';
 import {
   Wrench, Plus, Trash2, Edit3, Calendar, Search, Gauge, DollarSign,
   ListFilter, Shield, Tag, Package, FileText, X, AlertCircle,
-  ArrowUpDown, Check, Sparkles, ChevronRight
+  ArrowUpDown, Check, Sparkles, ChevronRight, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -250,11 +250,8 @@ export default function ServiceLogs({
                 </div>
                 <div>
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
-                    Pencatatan Servis & Spare Part
+                    Servis & Spare Part
                   </h1>
-                  <p className="text-amber-100/80 dark:text-slate-400 text-sm mt-0.5">
-                    Lacak biaya jasa servis, pergantian ban, gir set, serta onderdil motor
-                  </p>
                 </div>
               </div>
             </div>
@@ -349,7 +346,7 @@ export default function ServiceLogs({
               onClick={handleOpenAdd}
               className="mt-4 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md inline-flex items-center gap-1.5"
             >
-              <Plus className="w-4 h-4" /> Tambah Catatan Servis
+              <Plus className="w-4 h-4" /> Catat Servis
             </button>
           </div>
         ) : (
@@ -480,21 +477,31 @@ export default function ServiceLogs({
                   </div>
                   <div>
                     <h2 className="text-base font-extrabold text-slate-900 dark:text-white font-display">
-                      {editingId ? 'Edit Catatan Servis' : 'Tambah Catatan Servis'}
+                      {editingId ? 'Edit Servis' : 'Catat Servis'}
                     </h2>
-                    <p className="text-xs text-slate-400">Catat biaya servis & spare part yang diganti</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setIsFormOpen(false)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    id="btn-submit-service-header"
+                    type="submit"
+                    form="service-form"
+                    className="p-1.5 text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40 rounded-lg transition-colors cursor-pointer"
+                    title={editingId ? 'Simpan Perubahan' : 'Simpan Log Servis'}
+                  >
+                    <Save className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setIsFormOpen(false)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Form Content (Scrollable) */}
-              <form onSubmit={handleSubmit} className="overflow-y-auto py-4 space-y-4 flex-1 pr-1">
+              <form id="service-form" onSubmit={handleSubmit} className="overflow-y-auto py-4 space-y-4 flex-1 pr-1">
                 {formError && (
                   <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -630,23 +637,6 @@ export default function ServiceLogs({
                     rows={2}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden resize-none"
                   />
-                </div>
-
-                {/* Form Footer Actions */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsFormOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-amber-600/20"
-                  >
-                    {editingId ? 'Simpan Perubahan' : 'Simpan Log Servis'}
-                  </button>
                 </div>
               </form>
             </motion.div>

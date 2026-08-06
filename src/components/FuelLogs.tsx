@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import {
   Plus, Trash2, Edit3, Calendar, Search, Fuel, X, ArrowUpDown, AlertCircle, Sparkles,
-  TrendingUp, Droplets, DollarSign, Gauge, ListFilter, Clock, Satellite
+  TrendingUp, Droplets, DollarSign, Gauge, ListFilter, Clock, Satellite, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -296,9 +296,6 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
                     Pencatatan BBM
                   </h1>
-                  <p className="text-emerald-100/80 dark:text-slate-400 text-sm mt-0.5">
-                    Lacak konsumsi bahan bakar, biaya, dan efisiensi kendaraan
-                  </p>
                 </div>
               </div>
             </div>
@@ -309,7 +306,7 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
               onClick={handleOpenAdd}
               className="px-4 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-2 transition-all cursor-pointer border border-white/15 shadow-lg"
             >
-              <Plus className="w-4 h-4" /> Catat Pembelian BBM
+              <Plus className="w-4 h-4" /> Catat BBM
             </motion.button>
           </div>
 
@@ -471,20 +468,31 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                   <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
                     <Fuel className="w-4 h-4" />
                   </div>
-                  {editingId ? 'Edit Pembelian BBM' : 'Catat Pembelian BBM'}
+                  {editingId ? 'Edit Catatan BBM' : 'Catat BBM'}
                 </h3>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  id="close-fuel-form"
-                  onClick={resetForm}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </motion.button>
+                <div className="flex items-center gap-2">
+                  <button
+                    id="btn-submit-fuel-header"
+                    type="submit"
+                    form="fuel-form"
+                    className="p-1.5 text-emerald-600 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-900/40 rounded-lg transition-colors cursor-pointer"
+                    title={editingId ? 'Simpan Perubahan' : 'Simpan Catatan'}
+                  >
+                    <Save className="w-5 h-5" />
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    id="close-fuel-form"
+                    onClick={resetForm}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </motion.button>
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <form id="fuel-form" onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
                 <AnimatePresence>
                   {formError && (
                     <motion.div
@@ -551,28 +559,6 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                     })()}
                   </div>
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    id="btn-cancel-fuel"
-                    type="button"
-                    onClick={resetForm}
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-sm hover:opacity-80 transition-all cursor-pointer"
-                  >
-                    Batal
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    id="btn-submit-fuel"
-                    type="submit"
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer shadow-lg shadow-emerald-600/20"
-                  >
-                    {editingId ? 'Simpan Perubahan' : 'Simpan Pembelian'}
-                  </motion.button>
-                </div>
               </form>
             </motion.div>
           </motion.div>
@@ -586,14 +572,14 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
             <Fuel className="w-10 h-10 text-slate-300 dark:text-slate-600" />
           </div>
           <p className="font-bold text-base text-slate-500 dark:text-slate-400">Belum Ada Riwayat BBM</p>
-          <p className="text-sm text-slate-400 mt-1 max-w-xs">Catat pembelian BBM pertama Anda untuk mulai melacak konsumsi dan efisiensi.</p>
+          <p className="text-sm text-slate-400 mt-1 max-w-xs">Catat BBM pertama Anda untuk mulai melacak konsumsi dan efisiensi.</p>
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={handleOpenAdd}
             className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer shadow-lg shadow-emerald-600/20"
           >
-            <Plus className="w-4 h-4 inline mr-1" /> Catat Pembelian BBM
+            <Plus className="w-4 h-4 inline mr-1" /> Catat BBM
           </motion.button>
         </motion.div>
       ) : (

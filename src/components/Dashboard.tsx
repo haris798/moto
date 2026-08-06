@@ -460,7 +460,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => onNavigate('service')}
-                className="px-3.5 py-2.5 bg-white/95 text-indigo-700 font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/25"
+                className="px-3.5 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg"
               >
                 <Wrench className="w-4 h-4" /> Servis
               </motion.button>
@@ -500,14 +500,14 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             <div className="space-y-1">
               <span className="text-[11px] font-bold capitalize tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                 <Wrench className="w-3.5 h-3.5 text-indigo-500" />
-                Total Biaya Servis (30 Hari Terakhir)
+                Total Biaya Servis
               </span>
               <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display">
                 {formatIDR(serviceCost30Days)}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                 <CalendarDays className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>{serviceCount30Days > 0 ? `${serviceCount30Days}x servis dalam 30 hari terakhir` : 'Belum ada servis dalam 30 hari terakhir'}</span>
+                <span>{serviceCount30Days > 0 ? `${serviceCount30Days}x servis dalam 30` : 'Belum ada servis'}</span>
               </p>
             </div>
             <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shrink-0 group-hover:scale-110 transition-transform">
@@ -690,11 +690,8 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white font-display">
-                Ringkasan & Filter Periode
+                Ringkasan
               </h2>
-              <p className="text-xs text-slate-400">
-                Filter biaya BBM, oli, dan jarak tempuh berdasarkan rentang waktu
-              </p>
             </div>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-900/40 text-xs font-semibold self-start sm:self-auto">
@@ -1395,7 +1392,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                   <Compass className="w-4 h-4" />
                 </div>
                 <h3 className="font-bold text-slate-800 dark:text-white">
-                  Anatomi Konsumsi BBM
+                  Konsumsi BBM
                 </h3>
               </div>
               {avgEfficiency > 0 && (
