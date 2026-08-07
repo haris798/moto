@@ -3,10 +3,12 @@ import { AppSettings, SyncStatus, OilLog, FuelLog } from '../types';
 import { testSupabaseConnection, SUPABASE_SQL_SCRIPT, getSupabaseClient } from '../lib/supabaseClient';
 import { setDBItem } from '../lib/dbStorage';
 import { sendTelegramNotification } from '../utils/telegram';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import {
   Settings, Database, Send, Calendar, Milestone, Moon, Sun, Eye, EyeOff,
   Clipboard, Check, ShieldCheck, HelpCircle, LogIn, LogOut, RefreshCw, AlertTriangle,
-  Download, Save
+  Download, Save, Upload
 } from 'lucide-react';
 
 interface SettingsTabProps {
@@ -233,7 +235,6 @@ export default function SettingsTab({
     setTimeout(() => setCopiedSql(false), 2500);
   };
 
-  // Download all logs as backup JSON file
   const handleDownloadBackup = () => {
     try {
       const backupData = {
@@ -248,24 +249,97 @@ export default function SettingsTab({
       };
 
       const jsonString = JSON.stringify(backupData, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = url;
-
       const dateStr = new Date().toISOString().split('T')[0];
-      downloadAnchor.download = `motorku_backup_${dateStr}.json`;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
+      const fileName = `motorku_backup_${dateStr}.json`;
 
-      // Cleanup
-      document.body.removeChild(downloadAnchor);
-      URL.revokeObjectURL(url);
+      if (Capacitor.isNativePlatform()) {
+        await Filesystem.writeFile({
+          path: `Download/${fileName}`,
+          data: jsonString,
+          directory: Directory.ExternalStorage,
+          encoding: Encoding.UTF8
+        });
+        alert(`Berhasil membuat file cadangan di internal/Download/${fileName}`);
+      } else {
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = url;
+        downloadAnchor.download = fileName;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+
+        // Cleanup
+        document.body.removeChild(downloadAnchor);
+        URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('Gagal mengunduh cadangan:', error);
       alert('Gagal membuat file cadangan.');
     }
   };
+
+  // Export Supabase Config
+  const handleExportSupabaseConfig = async () => {
+    try {
+      const configData = {
+        url: supabaseUrl,
+        anonKey: supabaseKey,
+        email: authEmail,
+        password: authPassword
+      };
+      const jsonString = JSON.stringify(configData, null, 2);
+      const fileName = 'supabase_config.json';
+      
+      if (Capacitor.isNativePlatform()) {
+        await Filesystem.writeFile({
+          path: `Download/${fileName}`,
+          data: jsonString,
+          directory: Directory.ExternalStorage,
+          encoding: Encoding.UTF8
+        });
+        alert(`Berhasil mengekspor pengaturan ke internal/Download/${fileName}`);
+      } else {
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = url;
+        downloadAnchor.download = fileName;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        document.body.removeChild(downloadAnchor);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Gagal mengekspor pengaturan:', error);
+      alert('Gagal mengekspor pengaturan Supabase. Pastikan izin penyimpanan diberikan.');
+    }
+  };
+
+  // Import Supabase Config
+  const handleImportSupabaseConfig = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json.url !== undefined) setSupabaseUrl(json.url);
+        if (json.anonKey !== undefined) setSupabaseKey(json.anonKey);
+        if (json.email !== undefined) setAuthEmail(json.email);
+        if (json.password !== undefined) setAuthPassword(json.password);
+        alert('Pengaturan Supabase berhasil diimpor!');
+      } catch (error) {
+        console.error('Gagal mengimpor JSON:', error);
+        alert('Format file JSON tidak valid.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input
+    e.target.value = '';
+  };
+
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -497,7 +571,29 @@ export default function SettingsTab({
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-between items-center gap-3">
+          <div className="flex gap-2">
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              id="import-supabase"
+              onChange={handleImportSupabaseConfig}
+            />
+            <label
+              htmlFor="import-supabase"
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Upload className="w-3.5 h-3.5" /> Import JSON
+            </label>
+            <button
+              type="button"
+              onClick={handleExportSupabaseConfig}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" /> Export JSON
+            </button>
+          </div>
           <button
             id="btn-test-supabase"
             type="button"
