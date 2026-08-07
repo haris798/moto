@@ -235,7 +235,7 @@ export default function SettingsTab({
     setTimeout(() => setCopiedSql(false), 2500);
   };
 
-  const handleDownloadBackup = () => {
+  const handleDownloadBackup = async () => {
     try {
       const backupData = {
         app: 'Motor.ku Tracker',
