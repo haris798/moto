@@ -291,7 +291,7 @@ export default function SettingsTab({
       };
       const jsonString = JSON.stringify(configData, null, 2);
       const fileName = 'supabase_config.json';
-      
+
       if (Capacitor.isNativePlatform()) {
         await Filesystem.writeFile({
           path: `Download/${fileName}`,
@@ -437,7 +437,7 @@ export default function SettingsTab({
 
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/60">
           <div className="space-y-1">
-            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">File Cadangan Motor.ku</h4>
+            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Bakup Motor.ku</h4>
             <p className="text-[12px] text-slate-400">
               Total catatan: <span className="font-bold text-slate-700 dark:text-slate-300">{oilLogs.length} Ganti Oli</span> dan <span className="font-bold text-slate-700 dark:text-slate-300">{fuelLogs.length} BBM</span>
             </p>
@@ -585,14 +585,14 @@ export default function SettingsTab({
               htmlFor="import-supabase"
               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <Upload className="w-3.5 h-3.5" /> Import JSON
+              <Upload className="w-3.5 h-3.5" /> Import
             </label>
             <button
               type="button"
               onClick={handleExportSupabaseConfig}
               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <Download className="w-3.5 h-3.5" /> Export JSON
+              <Download className="w-3.5 h-3.5" /> Export
             </button>
           </div>
           <button
@@ -608,226 +608,226 @@ export default function SettingsTab({
               </>
             ) : (
               <>
-                <Database className="w-3.5 h-3.5" /> Simpan & Hubungkan Database
+                <Database className="w-3.5 h-3.5" /> Simpan
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* 4. Telegram Alert Configurations */ }
-  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
-    <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-      <Send className="w-5 h-5 text-indigo-500" /> Notifikasi (Telegram Bot API)
-    </h3>
+      {/* 4. Telegram Alert Configurations */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
+        <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
+          <Send className="w-5 h-5 text-indigo-500" /> Notifikasi Telegram
+        </h3>
 
-    <form onSubmit={handleSaveTelegram} className="space-y-4">
-      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850">
-        <div>
-          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
-            Aktifkan Pengingat Telegram
-          </label>
-        </div>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            id="toggle-telegram"
-            type="checkbox"
-            checked={tgEnabled}
-            onChange={(e) => setTgEnabled(e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
-        </label>
+        <form onSubmit={handleSaveTelegram} className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
+                Aktifkan Pengingat Telegram
+              </label>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                id="toggle-telegram"
+                type="checkbox"
+                checked={tgEnabled}
+                onChange={(e) => setTgEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
+                Telegram Bot Token
+              </label>
+              <div className="relative">
+                <input
+                  id="input-telegram-token"
+                  type={showTgToken ? 'text' : 'password'}
+                  required={tgEnabled}
+                  placeholder="1234567890:ABCdefGhIJKlmNoPQRsT..."
+                  value={tgToken}
+                  onChange={(e) => setTgToken(e.target.value)}
+                  disabled={!tgEnabled}
+                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50"
+                />
+                <button
+                  id="toggle-telegram-token-visibility"
+                  type="button"
+                  onClick={() => setShowTgToken(!showTgToken)}
+                  disabled={!tgEnabled}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 disabled:opacity-50"
+                >
+                  {showTgToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
+                Telegram Chat ID
+              </label>
+              <input
+                id="input-telegram-chatid"
+                type="text"
+                required={tgEnabled}
+                placeholder="Contoh: 987654321"
+                value={tgChatId}
+                onChange={(e) => setTgChatId(e.target.value)}
+                disabled={!tgEnabled}
+                className="w-full py-2.5 px-3 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
+                Kirim Peringatan Hari Sebelum Ganti Oli
+              </label>
+              <div className="relative">
+                <input
+                  id="input-telegram-days-before"
+                  type="number"
+                  required={tgEnabled}
+                  value={tgDays}
+                  onChange={(e) => setTgDays(Number(e.target.value))}
+                  disabled={!tgEnabled}
+                  className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50 font-bold"
+                />
+                <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-[12px] font-bold text-slate-400 pointer-events-none capitalize">
+                  Hari
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
+                Kirim Peringatan Jarak Sebelum Ganti Oli (km)
+              </label>
+              <div className="relative">
+                <input
+                  id="input-telegram-km-before"
+                  type="number"
+                  required={tgEnabled}
+                  value={tgKm}
+                  onChange={(e) => setTgKm(Number(e.target.value))}
+                  disabled={!tgEnabled}
+                  className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50 font-bold"
+                />
+                <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-[12px] font-bold text-slate-400 pointer-events-none capitalize">
+                  KM
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {tgMessage && (
+            <div className={`p-3 rounded-xl text-sm flex gap-2 border ${tgMessage.type === 'success'
+              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-150 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300'
+              : 'bg-rose-50 dark:bg-rose-950/30 border-rose-150 dark:border-rose-900/40 text-rose-800 dark:text-rose-300'
+              }`}>
+              <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{tgMessage.text}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col md:flex-row justify-between gap-3 pt-3 border-t border-slate-50 dark:border-slate-850">
+            {/* Instruction tooltip */}
+            <div className="text-[12px] text-slate-400 max-w-md flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-100 dark:border-slate-850">
+              <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0" />
+              <span>Cari <b>@BotFather</b> di Telegram untuk membuat bot Anda. Dapatkan Token, lalu kirim pesan apa saja ke <b>@userinfobot</b> untuk mengetahui Chat ID Anda.</span>
+            </div>
+
+            <div className="flex gap-2 self-end">
+              <button
+                id="btn-test-telegram"
+                type="button"
+                onClick={handleTestTelegram}
+                disabled={tgTesting || !tgEnabled}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-all cursor-pointer disabled:opacity-50"
+              >
+                {tgTesting ? 'Mengirim Uji Coba...' : 'Tes Notifikasi'}
+              </button>
+              <button
+                id="btn-save-telegram"
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Telegram Bot Token
-          </label>
-          <div className="relative">
-            <input
-              id="input-telegram-token"
-              type={showTgToken ? 'text' : 'password'}
-              required={tgEnabled}
-              placeholder="1234567890:ABCdefGhIJKlmNoPQRsT..."
-              value={tgToken}
-              onChange={(e) => setTgToken(e.target.value)}
-              disabled={!tgEnabled}
-              className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50"
-            />
+      {/* Auto Update APK & PWA Section */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 md:p-6 shadow-xs">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+            <RefreshCw className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Pembaruan Otomatis (APK & PWA)</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Pembaruan otomatis tanpa perlu uninstall aplikasi lama</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+            <div>
+              <span className="font-semibold block mb-0.5">Pembaruan Latar Belakang Aktif:</span>
+              Aplikasi terpasang (PWA / Web-APK) secara otomatis mengambil file dan fitur terbaru dari server tanpa menghapus data lokal atau perlu uninstall APK lama.
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800">
+            <div>
+              <span className="text-xs text-slate-400 block font-medium">Status Aplikasi:</span>
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Siap Auto Update (Network-First SW)
+              </span>
+            </div>
             <button
-              id="toggle-telegram-token-visibility"
               type="button"
-              onClick={() => setShowTgToken(!showTgToken)}
-              disabled={!tgEnabled}
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 disabled:opacity-50"
+              onClick={handleCheckAppUpdate}
+              disabled={checkingUpdate}
+              className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {showTgToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
+              {checkingUpdate ? 'Memeriksa & Memperbarui...' : 'Perbarui Aplikasi Sekarang'}
             </button>
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Telegram Chat ID Pengguna
-          </label>
-          <input
-            id="input-telegram-chatid"
-            type="text"
-            required={tgEnabled}
-            placeholder="Contoh: 987654321"
-            value={tgChatId}
-            onChange={(e) => setTgChatId(e.target.value)}
-            disabled={!tgEnabled}
-            className="w-full py-2.5 px-3 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50"
-          />
-        </div>
-      </div>
+          {updateStatus && (
+            <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs flex items-center gap-2">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+              <span>{updateStatus}</span>
+            </div>
+          )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Kirim Peringatan Hari Sebelum Ganti Oli
-          </label>
-          <div className="relative">
-            <input
-              id="input-telegram-days-before"
-              type="number"
-              required={tgEnabled}
-              value={tgDays}
-              onChange={(e) => setTgDays(Number(e.target.value))}
-              disabled={!tgEnabled}
-              className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50 font-bold"
-            />
-            <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-[12px] font-bold text-slate-400 pointer-events-none capitalize">
-              Hari
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Kirim Peringatan Jarak Sebelum Ganti Oli (km)
-          </label>
-          <div className="relative">
-            <input
-              id="input-telegram-km-before"
-              type="number"
-              required={tgEnabled}
-              value={tgKm}
-              onChange={(e) => setTgKm(Number(e.target.value))}
-              disabled={!tgEnabled}
-              className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50 font-bold"
-            />
-            <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-[12px] font-bold text-slate-400 pointer-events-none capitalize">
-              KM
-            </span>
+          {/* Guide for building/installing Android APK updates */}
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-150 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+            <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0" />
+              Petunjuk Update File APK Android (Satu Langkah Menimpa APK Lama):
+            </p>
+            <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+              <li>Gunakan <b>Package Name</b> (App ID) yang sama persis (misal: <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">com.motorku.app</code>).</li>
+              <li>Gunakan <b>Sertifikat / Keystore</b> tanda tangan yang sama saat men-generate file <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">.apk</code> baru.</li>
+              <li>Naikkan nilai <b>Version Code</b> pada pembuat APK (misal dari <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">1</code> ke <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">2</code>).</li>
+              <li>Saat diklik install di HP Android, OS akan otomatis mendeteksi sebagai <b>Pembaruan Aplikasi</b> dan menimpa APK lama tanpa perlu uninstall atau menghapus data.</li>
+            </ul>
           </div>
         </div>
       </div>
-
-      {tgMessage && (
-        <div className={`p-3 rounded-xl text-sm flex gap-2 border ${tgMessage.type === 'success'
-          ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-150 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300'
-          : 'bg-rose-50 dark:bg-rose-950/30 border-rose-150 dark:border-rose-900/40 text-rose-800 dark:text-rose-300'
-          }`}>
-          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{tgMessage.text}</span>
-        </div>
-      )}
-
-      <div className="flex flex-col md:flex-row justify-between gap-3 pt-3 border-t border-slate-50 dark:border-slate-850">
-        {/* Instruction tooltip */}
-        <div className="text-[12px] text-slate-400 max-w-md flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-100 dark:border-slate-850">
-          <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0" />
-          <span>Cari <b>@BotFather</b> di Telegram untuk membuat bot Anda. Dapatkan Token, lalu kirim pesan apa saja ke <b>@userinfobot</b> untuk mengetahui Chat ID Anda.</span>
-        </div>
-
-        <div className="flex gap-2 self-end">
-          <button
-            id="btn-test-telegram"
-            type="button"
-            onClick={handleTestTelegram}
-            disabled={tgTesting || !tgEnabled}
-            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-all cursor-pointer disabled:opacity-50"
-          >
-            {tgTesting ? 'Mengirim Uji Coba...' : 'Tes Notifikasi'}
-          </button>
-          <button
-            id="btn-save-telegram"
-            type="submit"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer"
-          >
-            Simpan
-          </button>
-        </div>
-      </div>
-    </form>
-  </div>
-
-  {/* Auto Update APK & PWA Section */}
-  <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 md:p-6 shadow-xs">
-    <div className="flex items-center gap-3 mb-4">
-      <div className="p-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
-        <RefreshCw className="w-5 h-5" />
-      </div>
-      <div>
-        <h3 className="text-base font-bold text-slate-900 dark:text-white">Pembaruan Otomatis (APK & PWA)</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Pembaruan otomatis tanpa perlu uninstall aplikasi lama</p>
-      </div>
-    </div>
-
-    <div className="space-y-4">
-      <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
-        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-        <div>
-          <span className="font-semibold block mb-0.5">Pembaruan Latar Belakang Aktif:</span>
-          Aplikasi terpasang (PWA / Web-APK) secara otomatis mengambil file dan fitur terbaru dari server tanpa menghapus data lokal atau perlu uninstall APK lama.
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800">
-        <div>
-          <span className="text-xs text-slate-400 block font-medium">Status Aplikasi:</span>
-          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Siap Auto Update (Network-First SW)
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={handleCheckAppUpdate}
-          disabled={checkingUpdate}
-          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
-          {checkingUpdate ? 'Memeriksa & Memperbarui...' : 'Perbarui Aplikasi Sekarang'}
-        </button>
-      </div>
-
-      {updateStatus && (
-        <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs flex items-center gap-2">
-          <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-          <span>{updateStatus}</span>
-        </div>
-      )}
-
-      {/* Guide for building/installing Android APK updates */}
-      <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-150 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
-        <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-          <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0" />
-          Petunjuk Update File APK Android (Satu Langkah Menimpa APK Lama):
-        </p>
-        <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-          <li>Gunakan <b>Package Name</b> (App ID) yang sama persis (misal: <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">com.motorku.app</code>).</li>
-          <li>Gunakan <b>Sertifikat / Keystore</b> tanda tangan yang sama saat men-generate file <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">.apk</code> baru.</li>
-          <li>Naikkan nilai <b>Version Code</b> pada pembuat APK (misal dari <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">1</code> ke <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">2</code>).</li>
-          <li>Saat diklik install di HP Android, OS akan otomatis mendeteksi sebagai <b>Pembaruan Aplikasi</b> dan menimpa APK lama tanpa perlu uninstall atau menghapus data.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
     </div >
   );
 }
