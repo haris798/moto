@@ -5,6 +5,7 @@ import { setDBItem } from '../lib/dbStorage';
 import { sendTelegramNotification } from '../utils/telegram';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import toast from 'react-hot-toast';
 import {
   Settings, Database, Send, Calendar, Milestone, Moon, Sun, Eye, EyeOff,
   Clipboard, Check, ShieldCheck, HelpCircle, LogIn, LogOut, RefreshCw, AlertTriangle,
@@ -115,7 +116,7 @@ export default function SettingsTab({
       oilChangeIntervalDays: Number(intervalDays),
       fuelPricePerLiter: Number(fuelPrice)
     });
-    alert('Pengaturan interval ganti oli dan harga BBM berhasil disimpan!');
+    toast.success('Pengaturan interval ganti oli dan harga BBM berhasil disimpan!');
   };
 
   // Handle Test & Connect Supabase
@@ -205,7 +206,7 @@ export default function SettingsTab({
         notifyOnKmBefore: Number(tgKm)
       }
     });
-    alert('Pengaturan notifikasi Telegram berhasil disimpan!');
+    toast.success('Pengaturan notifikasi Telegram berhasil disimpan!');
   };
 
   // Handle Test Telegram Alert
@@ -259,7 +260,7 @@ export default function SettingsTab({
           directory: Directory.ExternalStorage,
           encoding: Encoding.UTF8
         });
-        alert(`Berhasil membuat file cadangan di internal/Download/${fileName}`);
+        toast.success(`Berhasil membuat file cadangan di internal/Download/${fileName}`);
       } else {
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -275,7 +276,7 @@ export default function SettingsTab({
       }
     } catch (error) {
       console.error('Gagal mengunduh cadangan:', error);
-      alert('Gagal membuat file cadangan.');
+      toast.error('Gagal membuat file cadangan.');
     }
   };
 
@@ -298,7 +299,7 @@ export default function SettingsTab({
           directory: Directory.ExternalStorage,
           encoding: Encoding.UTF8
         });
-        alert(`Berhasil mengekspor pengaturan ke internal/Download/${fileName}`);
+        toast.success(`Berhasil mengekspor pengaturan ke internal/Download/${fileName}`);
       } else {
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -312,7 +313,7 @@ export default function SettingsTab({
       }
     } catch (error) {
       console.error('Gagal mengekspor pengaturan:', error);
-      alert('Gagal mengekspor pengaturan Supabase. Pastikan izin penyimpanan diberikan.');
+      toast.error('Gagal mengekspor pengaturan Supabase. Pastikan izin penyimpanan diberikan.');
     }
   };
 
@@ -329,10 +330,10 @@ export default function SettingsTab({
         if (json.anonKey !== undefined) setSupabaseKey(json.anonKey);
         if (json.email !== undefined) setAuthEmail(json.email);
         if (json.password !== undefined) setAuthPassword(json.password);
-        alert('Pengaturan Supabase berhasil diimpor!');
+        toast.success('Pengaturan Supabase berhasil diimpor!');
       } catch (error) {
         console.error('Gagal mengimpor JSON:', error);
-        alert('Format file JSON tidak valid.');
+        toast.error('Format file JSON tidak valid.');
       }
     };
     reader.readAsText(file);

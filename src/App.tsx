@@ -14,6 +14,7 @@ import {
   Gauge, Droplets, Fuel, Wrench, Settings, Cloud, CloudOff, FileSpreadsheet, FileText, RefreshCw,
   Sun, Moon, LogOut
 } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
 
 const DEFAULT_SETTINGS: AppSettings = {
   oilChangeIntervalKm: 2000,
@@ -245,7 +246,7 @@ export default function App() {
   ) => {
     if (!isOnline) {
       if (isInteractive) {
-        alert('Tidak ada koneksi internet. Sinkronisasi ditunda.');
+        import('react-hot-toast').then(({ toast }) => toast.error('Tidak ada koneksi internet. Sinkronisasi ditunda.'));
       }
       return;
     }
@@ -280,13 +281,13 @@ export default function App() {
       } else {
         setSyncStatus(prev => ({ ...prev, isSyncing: false }));
         if (isInteractive) {
-          alert(result.message);
+          import('react-hot-toast').then(({ toast }) => toast.error(result.message));
         }
       }
     } catch (e: any) {
       setSyncStatus(prev => ({ ...prev, isSyncing: false }));
       if (isInteractive) {
-        alert(`Gagal sinkronisasi: ${e.message || e}`);
+        import('react-hot-toast').then(({ toast }) => toast.error(`Gagal sinkronisasi: ${e.message || e}`));
       }
     }
   }, [isOnline, oilLogs, fuelLogs, serviceLogs, settings.supabase.connected]);
@@ -305,7 +306,7 @@ export default function App() {
       await removeDBItem('supabase_url');
       await removeDBItem('supabase_anon_key');
       await setDBItem('oil_tracker_settings', clearedSettings);
-      alert('Anda telah keluar dari akun cloud.');
+      import('react-hot-toast').then(({ toast }) => toast.success('Anda telah keluar dari akun cloud.'));
     }
   };
 
@@ -766,10 +767,10 @@ export default function App() {
           )}
         </main>
 
-        {/* 4. Geometric Footer / Bottom Bar */}
         <footer className="h-12 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between px-6 sm:px-8 bg-white/20 dark:bg-slate-900/30 text-[12px] text-slate-400 dark:text-slate-500 capitalize tracking-widest font-mono font-semibold shrink-0 select-none">
         </footer>
       </div>
+      <Toaster position="bottom-center" />
     </div>
   );
 }
