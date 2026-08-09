@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.4.2",
-    "@capacitor/filesystem": "^8.1.2",
     "@google/genai": "^2.4.0",
     "@supabase/supabase-js": "^2.110.9",
     "@tailwindcss/vite": "^4.1.14",
@@ -24,7 +23,6 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "react-hot-toast": "^2.6.0",
     "recharts": "^3.10.1",
     "vite": "^6.2.3"
   },

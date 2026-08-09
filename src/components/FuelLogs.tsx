@@ -277,28 +277,27 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
 
         <div className="relative z-10 p-5 md:p-7 lg:p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-white/15 backdrop-blur-sm rounded-xl ring-1 ring-white/20">
+                <Fuel className="w-5 h-5" />
+              </div>
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-white/15 backdrop-blur-sm rounded-xl ring-1 ring-white/20">
-                  <Fuel className="w-5 h-5" />
-                </div>
-                <div>
-                  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
-                    Pencatatan BBM
-                  </h1>
-                </div>
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
+                  Pencatatan BBM
+                </h1>
+                <motion.button
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.93 }}
+                  id="btn-add-fuel-log"
+                  onClick={handleOpenAdd}
+                  title="Catat BBM"
+                  className="p-1.5 md:p-2 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white rounded-xl transition-all cursor-pointer border border-white/15 shadow-md flex items-center justify-center shrink-0"
+                >
+                  <Plus className="w-5 h-5" />
+                </motion.button>
               </div>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              id="btn-add-fuel-log"
-              onClick={handleOpenAdd}
-              className="px-4 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-2 transition-all cursor-pointer border border-white/15 shadow-lg"
-            >
-              <Plus className="w-4 h-4" /> Catat BBM
-            </motion.button>
           </div>
 
           {/* Mini stats row */}
@@ -627,28 +626,30 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                             </div>
                           </div>
 
-                          <div className="flex gap-1 items-center">
+                          <div className="flex gap-1.5 items-center">
                             <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
                               id={`btn-edit-fuel-${log.id}`}
                               onClick={() => handleOpenEdit(log)}
                               title="Edit Catatan"
-                              className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all cursor-pointer"
+                              className="px-2.5 py-1.5 sm:p-1.5 text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                             >
-                              <Edit3 className="w-4 h-4" />
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span className="text-[11px] font-bold sm:hidden">Edit</span>
                             </motion.button>
                             <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
                               id={`btn-delete-fuel-${log.id}`}
                               onClick={() => {
                                 if (confirm('Apakah Anda yakin ingin menghapus catatan BBM ini?')) onDeleteLog(log.id);
                               }}
                               title="Hapus Catatan"
-                              className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all cursor-pointer"
+                              className="px-2.5 py-1.5 sm:p-1.5 text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/80 dark:border-rose-800/60 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span className="text-[11px] font-bold sm:hidden">Hapus</span>
                             </motion.button>
                           </div>
                         </div>

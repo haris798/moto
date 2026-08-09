@@ -1,6 +1,7 @@
-import { useState, useMemo, type FormEvent } from 'react';
+import { useState, useMemo, useEffect, type FormEvent } from 'react';
 import { ServiceLog, AppSettings } from '../types';
 import { formatIDR } from '../utils/export';
+import { getDBItem, setDBItem } from '../lib/dbStorage';
 import {
   Wrench, Plus, Trash2, Edit3, Calendar, Search, Gauge, DollarSign,
   ListFilter, Shield, Tag, Package, FileText, X, AlertCircle,
@@ -71,6 +72,47 @@ export default function ServiceLogs({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Master Spare Parts Local Table State
+  const [presetParts, setPresetParts] = useState<string[]>(PRESET_PARTS);
+  const [masterPartSearch, setMasterPartSearch] = useState('');
+  const [masterViewMode, setMasterViewMode] = useState<'chips' | 'table'>('chips');
+
+  useEffect(() => {
+    getDBItem<string[]>('oil_tracker_preset_parts', PRESET_PARTS).then(saved => {
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        setPresetParts(saved);
+      }
+    });
+  }, []);
+
+  const handleAddMasterPart = (partName: string) => {
+    const trimmed = partName.trim();
+    if (!trimmed) return;
+    if (!presetParts.some(p => p.toLowerCase() === trimmed.toLowerCase())) {
+      const updated = [...presetParts, trimmed];
+      setPresetParts(updated);
+      setDBItem('oil_tracker_preset_parts', updated);
+    }
+  };
+
+  const handleDeleteMasterPart = (partToDelete: string) => {
+    const updated = presetParts.filter(p => p !== partToDelete);
+    setPresetParts(updated);
+    setDBItem('oil_tracker_preset_parts', updated);
+  };
+
+  const handleResetMasterParts = () => {
+    setPresetParts(PRESET_PARTS);
+    setDBItem('oil_tracker_preset_parts', PRESET_PARTS);
+    setMasterPartSearch('');
+  };
+
+  const filteredMasterParts = useMemo(() => {
+    if (!masterPartSearch.trim()) return presetParts;
+    const q = masterPartSearch.toLowerCase();
+    return presetParts.filter(p => p.toLowerCase().includes(q));
+  }, [presetParts, masterPartSearch]);
+
   // Form Fields
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [cost, setCost] = useState<number | ''>('');
@@ -126,10 +168,17 @@ export default function ServiceLogs({
     );
   };
 
+  const handleRemovePart = (indexToRemove: number) => {
+    setSelectedParts(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const handleAddCustomPart = () => {
     const trimmed = customPartInput.trim();
-    if (trimmed && !selectedParts.includes(trimmed)) {
-      setSelectedParts(prev => [...prev, trimmed]);
+    if (trimmed) {
+      if (!selectedParts.includes(trimmed)) {
+        setSelectedParts(prev => [...prev, trimmed]);
+      }
+      handleAddMasterPart(trimmed);
       setCustomPartInput('');
     }
   };
@@ -242,28 +291,27 @@ export default function ServiceLogs({
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
 
         <div className="relative z-10 p-5 md:p-7 lg:p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-white/15 backdrop-blur-sm rounded-xl ring-1 ring-white/20">
+                <Wrench className="w-5 h-5" />
+              </div>
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-white/15 backdrop-blur-sm rounded-xl ring-1 ring-white/20">
-                  <Wrench className="w-5 h-5" />
-                </div>
-                <div>
-                  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
-                    Servis & Spare Part
-                  </h1>
-                </div>
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight font-display">
+                  Servis & Spare Part
+                </h1>
+                <motion.button
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.93 }}
+                  id="btn-add-service-log"
+                  onClick={handleOpenAdd}
+                  title="Catat Servis Baru"
+                  className="p-1.5 md:p-2 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white rounded-xl transition-all cursor-pointer border border-white/15 shadow-md flex items-center justify-center shrink-0"
+                >
+                  <Plus className="w-5 h-5" />
+                </motion.button>
               </div>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              id="btn-add-service-log"
-              onClick={handleOpenAdd}
-              className="px-4 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-2 transition-all cursor-pointer border border-white/15 shadow-lg"
-            >
-              <Plus className="w-4 h-4" /> Catat Servis Baru
-            </motion.button>
           </div>
 
           {/* Mini Stats Summary Bar */}
@@ -397,20 +445,24 @@ export default function ServiceLogs({
                         </div>
 
                         {/* Actions: Edit & Delete */}
-                        <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1.5 shrink-0 opacity-90 group-hover:opacity-100 transition-opacity">
                           <button
+                            type="button"
                             onClick={() => handleOpenEdit(log)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                            className="px-2.5 py-1.5 sm:p-1.5 rounded-xl text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200/80 dark:border-amber-800/60 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                             title="Edit Log Servis"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span className="text-[11px] font-bold sm:hidden">Edit</span>
                           </button>
                           <button
+                            type="button"
                             onClick={() => setDeletingId(log.id)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                            className="px-2.5 py-1.5 sm:p-1.5 rounded-xl text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/80 dark:border-rose-800/60 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                             title="Hapus Log Servis"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="text-[11px] font-bold sm:hidden">Hapus</span>
                           </button>
                         </div>
                       </div>
@@ -554,51 +606,280 @@ export default function ServiceLogs({
                   />
                 </div>
 
-                {/* Preset Spare Part Checkbox Chips */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                    <span>Spare Part / Onderdil Diganti</span>
-                    <span className="text-[10px] text-amber-600 font-semibold">{selectedParts.length} Dipilih</span>
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    {PRESET_PARTS.map((partName) => {
-                      const isSelected = selectedParts.includes(partName);
-                      return (
+                {/* Spare Part / Onderdil Diganti (Master Data Add/Delete Manager) */}
+                <div className="space-y-3 p-3.5 md:p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-700/60 pb-2.5">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-amber-500" />
+                      <span>Kelola Master Data Spare Part / Onderdil</span>
+                    </label>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      {/* View Mode Toggle: Chips vs Table */}
+                      <div className="flex items-center gap-0.5 bg-slate-200/80 dark:bg-slate-700/80 p-0.5 rounded-lg text-[10px] font-bold">
                         <button
-                          key={partName}
                           type="button"
-                          onClick={() => handleTogglePart(partName)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                            isSelected
-                              ? 'bg-amber-600 text-white shadow-xs'
-                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                          onClick={() => setMasterViewMode('chips')}
+                          className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                            masterViewMode === 'chips'
+                              ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-2xs font-bold'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                           }`}
                         >
-                          {isSelected && <Check className="w-3 h-3" />}
-                          {partName}
+                          Chips
                         </button>
-                      );
-                    })}
+                        <button
+                          type="button"
+                          onClick={() => setMasterViewMode('table')}
+                          className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                            masterViewMode === 'table'
+                              ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-2xs font-bold'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                          }`}
+                        >
+                          Tabel
+                        </button>
+                      </div>
+
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-100/70 dark:bg-amber-950/70 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-900/40">
+                        {presetParts.length} Item
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleResetMasterParts}
+                        title="Kembalikan daftar master data ke preset bawaan"
+                        className="text-[10px] text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 underline font-medium cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Add Custom Spare Part Input */}
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      type="text"
-                      value={customPartInput}
-                      onChange={(e) => setCustomPartInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomPart(); } }}
-                      placeholder="+ Tambah sparepart lain..."
-                      className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-hidden"
-                    />
+                  {/* Active Selected Spare Parts for Current Record */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                        <Tag className="w-3.5 h-3.5 text-amber-500" /> Spare Part Dipilih ({selectedParts.length}):
+                      </span>
+                    </div>
+                    {selectedParts.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-amber-500/10 dark:bg-amber-950/40 rounded-xl border border-amber-200/70 dark:border-amber-900/50 min-h-[38px] items-center">
+                        {selectedParts.map((partName, idx) => (
+                          <span
+                            key={`selected-${partName}-${idx}`}
+                            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg text-xs font-bold bg-amber-600 text-white shadow-2xs"
+                          >
+                            <Check className="w-3 h-3 shrink-0" />
+                            <span>{partName}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePart(idx)}
+                              title={`Hapus ${partName} dari catatan ini`}
+                              className="p-0.5 hover:bg-amber-700 rounded-md text-amber-100 hover:text-white transition-colors cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500 italic p-2 bg-white dark:bg-slate-900/60 rounded-xl border border-dashed border-slate-200 dark:border-slate-700/80 text-center">
+                        Belum ada spare part dipilih. Klik item di bawah untuk memilih.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input field to add NEW item to master data list */}
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={customPartInput}
+                        onChange={(e) => setCustomPartInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomPart();
+                          }
+                        }}
+                        placeholder="Ketik spare part baru (cth: Kampas Rem, Busi, Ban, dll)..."
+                        className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden font-medium"
+                      />
+                      {customPartInput && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomPartInput('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={handleAddCustomPart}
-                      className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                      disabled={!customPartInput.trim()}
+                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1 shrink-0 shadow-2xs"
                     >
-                      Tambah
+                      <Plus className="w-3.5 h-3.5" /> + Tambah Ke Master
                     </button>
                   </div>
+
+                  {/* Search Bar for Master Items */}
+                  {presetParts.length > 6 && (
+                    <div className="px-2.5 py-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                      <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <input
+                        type="text"
+                        value={masterPartSearch}
+                        onChange={(e) => setMasterPartSearch(e.target.value)}
+                        placeholder="Cari dalam master data spare part..."
+                        className="w-full bg-transparent text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden font-medium"
+                      />
+                      {masterPartSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setMasterPartSearch('')}
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Master Data DISPLAY MODE: CHIPS vs TABLE */}
+                  {masterViewMode === 'chips' ? (
+                    /* CHIPS MODE WITH DIRECT DELETE BUTTON ON EACH CHIP */
+                    <div className="space-y-1 pt-1">
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                        <span>Pilihan Cepat (Klik teks untuk Pilih, Klik [x] untuk Hapus Master):</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                        {filteredMasterParts.length === 0 ? (
+                          <div className="w-full text-center py-4 text-xs text-slate-400 italic">
+                            Tidak ada spare part ditemukan.
+                          </div>
+                        ) : (
+                          filteredMasterParts.map((partName) => {
+                            const isSelected = selectedParts.includes(partName);
+                            return (
+                              <div
+                                key={partName}
+                                className={`inline-flex items-center rounded-xl text-xs font-bold transition-all border shadow-2xs group ${
+                                  isSelected
+                                    ? 'bg-amber-600 text-white border-amber-600'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-200/90 dark:border-slate-700'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePart(partName)}
+                                  className="pl-2.5 pr-2 py-1.5 flex items-center gap-1.5 cursor-pointer select-none"
+                                >
+                                  {isSelected ? (
+                                    <Check className="w-3.5 h-3.5 shrink-0 stroke-[3]" />
+                                  ) : (
+                                    <Plus className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                                  )}
+                                  <span>{partName}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMasterPart(partName);
+                                  }}
+                                  title={`Hapus "${partName}" dari Master Data`}
+                                  className={`pr-2 pl-1.5 py-1.5 transition-colors cursor-pointer border-l ${
+                                    isSelected
+                                      ? 'hover:bg-rose-700 text-amber-100 hover:text-white border-amber-500/50'
+                                      : 'hover:bg-rose-100 dark:hover:bg-rose-950/60 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 border-slate-200 dark:border-slate-700'
+                                  }`}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* TABEL MODE WITH CHECKBOX AND TRASH ICON */
+                    <div className="border border-slate-200/90 dark:border-slate-700/80 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
+                      <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
+                        {filteredMasterParts.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-slate-400 italic">
+                            Tabel master spare part kosong.
+                          </div>
+                        ) : (
+                          filteredMasterParts.map((partName, idx) => {
+                            const isSelected = selectedParts.includes(partName);
+                            return (
+                              <div
+                                key={`${partName}-${idx}`}
+                                className={`flex items-center justify-between px-3 py-2 text-xs transition-colors ${
+                                  isSelected
+                                    ? 'bg-amber-500/10 dark:bg-amber-950/40'
+                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                }`}
+                              >
+                                <div
+                                  onClick={() => handleTogglePart(partName)}
+                                  className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0 pr-2 select-none"
+                                >
+                                  <div
+                                    className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                                      isSelected
+                                        ? 'bg-amber-600 border-amber-600 text-white'
+                                        : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                                    }`}
+                                  >
+                                    {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                  </div>
+                                  <span className={`truncate font-medium ${isSelected ? 'text-amber-800 dark:text-amber-300 font-bold' : 'text-slate-700 dark:text-slate-200'}`}>
+                                    {partName}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTogglePart(partName)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all flex items-center gap-1 ${
+                                      isSelected
+                                        ? 'bg-amber-600 text-white shadow-2xs'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-950/80 hover:text-amber-800 dark:hover:text-amber-300 border border-slate-200/80 dark:border-slate-700/80'
+                                    }`}
+                                  >
+                                    {isSelected ? (
+                                      <>
+                                        <Check className="w-3 h-3" /> Dipilih
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="w-3 h-3" /> Pilih
+                                      </>
+                                    )}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMasterPart(partName)}
+                                    title={`Hapus "${partName}" dari tabel master`}
+                                    className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Total Biaya (Jasa + Sparepart) */}
