@@ -5,6 +5,7 @@ import { initIndexedDB, getDBItem, setDBItem, removeDBItem } from './lib/dbStora
 import { checkAndSendOilAlert } from './utils/telegram';
 import { exportToCSV, exportToPDF } from './utils/export';
 import { generateUUID } from './utils/uuid';
+import { useToast } from './components/ToastContainer';
 import Dashboard from './components/Dashboard';
 import OilLogs from './components/OilLogs';
 import FuelLogs from './components/FuelLogs';
@@ -35,6 +36,8 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export default function App() {
+  const { showToast, showConfirm } = useToast();
+
   // 1. State Inti (Core States)
   // Menyimpan data riwayat oli, BBM, servis, pengaturan, status user, dan state UI
   const [oilLogs, setOilLogs] = useState<OilLog[]>([]);
@@ -245,7 +248,7 @@ export default function App() {
   ) => {
     if (!isOnline) {
       if (isInteractive) {
-        alert('Tidak ada koneksi internet. Sinkronisasi ditunda.');
+        showToast('Tidak ada koneksi internet. Sinkronisasi ditunda.', 'warning', 'Koneksi Terputus');
       }
       return;
     }
@@ -277,36 +280,49 @@ export default function App() {
           pendingSyncCount: 0,
           isSyncing: false
         });
+
+        if (isInteractive) {
+          showToast('Sinkronisasi data cloud berhasil!', 'success', 'Sinkron Selesai');
+        }
       } else {
         setSyncStatus(prev => ({ ...prev, isSyncing: false }));
         if (isInteractive) {
-          alert(result.message);
+          showToast(result.message, 'error', 'Gagal Sinkron');
         }
       }
     } catch (e: any) {
       setSyncStatus(prev => ({ ...prev, isSyncing: false }));
       if (isInteractive) {
-        alert(`Gagal sinkronisasi: ${e.message || e}`);
+        showToast(`Gagal sinkronisasi: ${e.message || e}`, 'error', 'Gagal Sinkron');
       }
     }
-  }, [isOnline, oilLogs, fuelLogs, serviceLogs, settings.supabase.connected]);
+  }, [isOnline, oilLogs, fuelLogs, serviceLogs, settings.supabase.connected, showToast]);
 
   const handleLogout = async () => {
-    const client = getSupabaseClient();
-    if (client) {
-      await client.auth.signOut();
-      setUser(null);
-      // Clean supabase keys from settings on logout to ensure safety
-      const clearedSettings = {
-        ...settings,
-        supabase: { url: '', anonKey: '', connected: false }
-      };
-      setSettings(clearedSettings);
-      await removeDBItem('supabase_url');
-      await removeDBItem('supabase_anon_key');
-      await setDBItem('oil_tracker_settings', clearedSettings);
-      alert('Anda telah keluar dari akun cloud.');
-    }
+    showConfirm({
+      title: 'Keluar dari Cloud',
+      message: 'Apakah Anda yakin ingin keluar dari akun cloud Supabase?',
+      confirmText: 'Ya, Keluar',
+      cancelText: 'Batal',
+      type: 'warning',
+      onConfirm: async () => {
+        const client = getSupabaseClient();
+        if (client) {
+          await client.auth.signOut();
+          setUser(null);
+          // Clean supabase keys from settings on logout to ensure safety
+          const clearedSettings = {
+            ...settings,
+            supabase: { url: '', anonKey: '', connected: false }
+          };
+          setSettings(clearedSettings);
+          await removeDBItem('supabase_url');
+          await removeDBItem('supabase_anon_key');
+          await setDBItem('oil_tracker_settings', clearedSettings);
+          showToast('Anda telah keluar dari akun cloud.', 'info', 'Logout');
+        }
+      }
+    });
   };
 
   // Log handlers

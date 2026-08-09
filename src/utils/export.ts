@@ -1,4 +1,5 @@
 import { OilLog, FuelLog, ServiceLog } from '../types';
+import { softToast } from '../components/ToastContainer';
 
 /**
  * Helper to format currency in Indonesian Rupiah
@@ -114,7 +115,7 @@ export function exportToCSV(
 export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[], serviceLogs: ServiceLog[] = []) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
-    alert('Pop-up diblokir! Harap izinkan pop-up untuk mencetak laporan PDF.');
+    softToast('Pop-up diblokir! Harap izinkan pop-up untuk mencetak laporan PDF.', 'warning', 'Akses Pop-Up');
     return;
   }
 

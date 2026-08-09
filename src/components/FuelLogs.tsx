@@ -2,6 +2,7 @@ import { useState, useMemo, type FormEvent } from 'react';
 import { FuelLog, AppSettings } from '../types';
 import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
+import { useToast } from './ToastContainer';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
@@ -75,6 +76,8 @@ const getEfficiencyBadge = (eff: number | undefined) => {
 // Komponen utama untuk mengelola pencatatan riwayat pembelian BBM kendaraan.
 // Menghitung dan melacak efisiensi konsumsi bahan bakar (km/L) berdasarkan data perjalanan.
 export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, settings }: FuelLogsProps) {
+  const { showToast, showConfirm } = useToast();
+
   // State lokal untuk manajemen modal form (Tambah/Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -191,8 +194,13 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
     const mNum = validMileages.length > 0 ? Math.max(...validMileages) : 0;
 
     const logData = { date, mileage: mNum, liters: lNum, cost: actualCost, fuel_type: 'Pertalite', notes: '', efficiency };
-    if (editingId) onEditLog(editingId, logData);
-    else onAddLog(logData);
+    if (editingId) {
+      onEditLog(editingId, logData);
+      showToast('Catatan pembelian BBM berhasil diperbarui.', 'success', 'BBM Disimpan');
+    } else {
+      onAddLog(logData);
+      showToast('Catatan pembelian BBM baru berhasil ditambahkan!', 'success', 'BBM Ditambah');
+    }
     resetForm();
     setIsFormOpen(false);
   };
@@ -643,7 +651,17 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                               whileTap={{ scale: 0.95 }}
                               id={`btn-delete-fuel-${log.id}`}
                               onClick={() => {
-                                if (confirm('Apakah Anda yakin ingin menghapus catatan BBM ini?')) onDeleteLog(log.id);
+                                showConfirm({
+                                  title: 'Hapus Catatan BBM',
+                                  message: 'Apakah Anda yakin ingin menghapus catatan pembelian BBM tanggal ' + (log.date || '') + '?',
+                                  confirmText: 'Ya, Hapus',
+                                  cancelText: 'Batal',
+                                  type: 'danger',
+                                  onConfirm: () => {
+                                    onDeleteLog(log.id);
+                                    showToast('Catatan BBM berhasil dihapus.', 'info', 'Dihapus');
+                                  }
+                                });
                               }}
                               title="Hapus Catatan"
                               className="px-2.5 py-1.5 sm:p-1.5 text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/80 dark:border-rose-800/60 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs"

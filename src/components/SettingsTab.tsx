@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppSettings, SyncStatus, OilLog, FuelLog } from '../types';
 import { testSupabaseConnection, SUPABASE_SQL_SCRIPT, getSupabaseClient } from '../lib/supabaseClient';
 import { setDBItem } from '../lib/dbStorage';
 import { sendTelegramNotification } from '../utils/telegram';
+import { useToast } from './ToastContainer';
 import {
   Settings, Database, Send, Calendar, Milestone, Moon, Sun, Eye, EyeOff,
   Clipboard, Check, ShieldCheck, HelpCircle, LogIn, LogOut, RefreshCw, AlertTriangle,
-  Download, Save
+  Download, Upload, Save
 } from 'lucide-react';
 
 interface SettingsTabProps {
@@ -34,6 +35,8 @@ export default function SettingsTab({
   onOpenAuth,
   onLogout
 }: SettingsTabProps) {
+  const { showToast } = useToast();
+
   // Local form state untuk sinkronisasi Database Supabase
   const [supabaseUrl, setSupabaseUrl] = useState(settings.supabase.url);
   const [supabaseKey, setSupabaseKey] = useState(settings.supabase.anonKey);
@@ -113,7 +116,7 @@ export default function SettingsTab({
       oilChangeIntervalDays: Number(intervalDays),
       fuelPricePerLiter: Number(fuelPrice)
     });
-    alert('Pengaturan interval ganti oli dan harga BBM berhasil disimpan!');
+    showToast('Pengaturan interval ganti oli & harga BBM berhasil disimpan!', 'success', 'Pengaturan Tersimpan');
   };
 
   // Handle Test & Connect Supabase
@@ -189,6 +192,102 @@ export default function SettingsTab({
     setDbConnecting(false);
   };
 
+  // Ref for Supabase Config JSON file import input
+  const supabaseFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Export Supabase JSON settings to Download folder
+  const handleExportSupabaseConfig = () => {
+    try {
+      const configData = {
+        app: 'Motor.ku Tracker',
+        type: 'supabase_config',
+        exportedAt: new Date().toISOString(),
+        supabase: {
+          url: supabaseUrl.trim(),
+          anonKey: supabaseKey.trim(),
+          email: authEmail.trim(),
+          password: authPassword.trim()
+        }
+      };
+
+      const jsonString = JSON.stringify(configData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      downloadAnchor.download = `supabase_config_${dateStr}.json`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+
+      document.body.removeChild(downloadAnchor);
+      URL.revokeObjectURL(url);
+      showToast('Konfigurasi Supabase berhasil diekspor ke folder Download!', 'success', 'Ekspor Supabase');
+    } catch (error) {
+      console.error('Gagal mengekspor konfigurasi Supabase:', error);
+      showToast('Gagal membuat file JSON Supabase.', 'error', 'Error Ekspor');
+    }
+  };
+
+  // Import Supabase JSON settings from local file
+  const handleImportSupabaseConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        const config = parsed.supabase || parsed.settings?.supabase || parsed;
+
+        const importedUrl = config.url || config.supabaseUrl || '';
+        const importedKey = config.anonKey || config.supabaseKey || config.key || '';
+        const importedEmail = config.email || config.authEmail || '';
+        const importedPassword = config.password || config.authPassword || '';
+
+        if (!importedUrl && !importedKey) {
+          showToast('File JSON tidak berisi konfigurasi Supabase yang valid.', 'error', 'Format Tidak Valid');
+          return;
+        }
+
+        setSupabaseUrl(importedUrl);
+        setSupabaseKey(importedKey);
+        setAuthEmail(importedEmail);
+        setAuthPassword(importedPassword);
+
+        // Update settings in state & storage
+        onUpdateSettings({
+          ...settings,
+          supabase: {
+            url: importedUrl,
+            anonKey: importedKey,
+            email: importedEmail,
+            password: importedPassword,
+            connected: settings.supabase.connected
+          }
+        });
+
+        await setDBItem('supabase_url', importedUrl);
+        await setDBItem('supabase_anon_key', importedKey);
+        await setDBItem('supabase_email', importedEmail);
+        await setDBItem('supabase_password', importedPassword);
+
+        showToast('Konfigurasi Supabase berhasil diimpor dari file JSON!', 'success', 'Impor Supabase');
+      } catch (err) {
+        console.error('Gagal membaca file JSON Supabase:', err);
+        showToast('File JSON rusak atau format tidak sesuai.', 'error', 'Gagal Impor');
+      } finally {
+        if (event.target) {
+          event.target.value = '';
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // Handle Save Telegram Configurations
   const handleSaveTelegram = (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,7 +302,7 @@ export default function SettingsTab({
         notifyOnKmBefore: Number(tgKm)
       }
     });
-    alert('Pengaturan notifikasi Telegram berhasil disimpan!');
+    showToast('Pengaturan notifikasi Telegram berhasil disimpan!', 'success', 'Telegram Config');
   };
 
   // Handle Test Telegram Alert
@@ -261,9 +360,10 @@ export default function SettingsTab({
       // Cleanup
       document.body.removeChild(downloadAnchor);
       URL.revokeObjectURL(url);
+      showToast('File cadangan data berhasil diunduh!', 'success', 'Backup JSON');
     } catch (error) {
       console.error('Gagal mengunduh cadangan:', error);
-      alert('Gagal membuat file cadangan.');
+      showToast('Gagal membuat file cadangan.', 'error', 'Error Backup');
     }
   };
 
@@ -497,13 +597,52 @@ export default function SettingsTab({
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
+        {/* Action Panel for Backup & Import Supabase Config JSON */}
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-950/50 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
+          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+            <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">Cadangan Seting Supabase (JSON)</span>
+            <span>Ekspor / impor file JSON kredensial ke folder Download hp/komputer Anda</span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            {/* Hidden File Input for Import */}
+            <input
+              type="file"
+              ref={supabaseFileInputRef}
+              accept=".json"
+              onChange={handleImportSupabaseConfig}
+              className="hidden"
+            />
+
+            <button
+              id="btn-import-supabase-json"
+              type="button"
+              onClick={() => supabaseFileInputRef.current?.click()}
+              className="flex-1 sm:flex-none px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              title="Pilih & impor file JSON seting Supabase dari folder Download"
+            >
+              <Upload className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Impor JSON
+            </button>
+
+            <button
+              id="btn-export-supabase-json"
+              type="button"
+              onClick={handleExportSupabaseConfig}
+              className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900/90 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              title="Unduh file JSON seting Supabase ke folder Download"
+            >
+              <Download className="w-3.5 h-3.5" /> Ekspor JSON
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-1">
           <button
             id="btn-test-supabase"
             type="button"
             onClick={handleConnectSupabase}
             disabled={dbConnecting}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer flex items-center gap-1.5"
+            className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-indigo-500/20"
           >
             {dbConnecting ? (
               <>

@@ -3,6 +3,7 @@ import { OilLog, AppSettings, Jarak } from '../types';
 import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
 import { getSyncItem, getDBItem } from '../lib/dbStorage';
+import { useToast } from './ToastContainer';
 import {
   Plus, Trash2, Edit3, Calendar, Wrench, Star, X, ArrowUpDown, AlertCircle,
   Droplets, Gauge, DollarSign, Clock, Shield, Award, Save
@@ -35,6 +36,8 @@ const scaleIn = {
 // Komponen utama untuk mengelola pencatatan riwayat ganti oli kendaraan.
 // Mendukung penambahan, pengeditan, penghapusan, pencarian, dan filter data oli.
 export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settings }: OilLogsProps) {
+  const { showToast, showConfirm } = useToast();
+
   // State lokal untuk manajemen modal form (Tambah/Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -86,8 +89,13 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
       mNum = logs.length > 0 ? Math.max(...logs.map(l => l.mileage)) : 0;
     }
     const logData = { date, mileage: mNum, cost: actualCost, oil_brand: 'Yamalube', oil_type: 'Yamalube Standard', notes: '', rating: 5 };
-    if (editingId) onEditLog(editingId, logData);
-    else onAddLog(logData);
+    if (editingId) {
+      onEditLog(editingId, logData);
+      showToast('Catatan ganti oli berhasil diperbarui.', 'success', 'Oli Disimpan');
+    } else {
+      onAddLog(logData);
+      showToast('Catatan ganti oli baru berhasil ditambahkan!', 'success', 'Oli Ditambah');
+    }
     resetForm();
     setIsFormOpen(false);
   };
@@ -474,7 +482,17 @@ export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settin
                               whileTap={{ scale: 0.95 }}
                               id={`btn-delete-oil-${log.id}`}
                               onClick={() => {
-                                if (confirm('Apakah Anda yakin ingin menghapus catatan ganti oli ini?')) onDeleteLog(log.id);
+                                showConfirm({
+                                  title: 'Hapus Catatan Oli',
+                                  message: 'Apakah Anda yakin ingin menghapus catatan ganti oli tanggal ' + (log.date || '') + '?',
+                                  confirmText: 'Ya, Hapus',
+                                  cancelText: 'Batal',
+                                  type: 'danger',
+                                  onConfirm: () => {
+                                    onDeleteLog(log.id);
+                                    showToast('Catatan ganti oli berhasil dihapus.', 'info', 'Dihapus');
+                                  }
+                                });
                               }}
                               title="Hapus Catatan"
                               className="px-2.5 py-1.5 sm:p-1.5 text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/80 dark:border-rose-800/60 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs"

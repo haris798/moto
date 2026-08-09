@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, type FormEvent } from 'react';
 import { ServiceLog, AppSettings } from '../types';
 import { formatIDR } from '../utils/export';
 import { getDBItem, setDBItem } from '../lib/dbStorage';
+import { useToast } from './ToastContainer';
 import {
   Wrench, Plus, Trash2, Edit3, Calendar, Search, Gauge, DollarSign,
   ListFilter, Shield, Tag, Package, FileText, X, AlertCircle,
@@ -68,6 +69,8 @@ export default function ServiceLogs({
   onDeleteLog,
   settings
 }: ServiceLogsProps) {
+  const { showToast } = useToast();
+
   // Modal Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -212,8 +215,10 @@ export default function ServiceLogs({
 
     if (editingId) {
       onEditLog(editingId, logData);
+      showToast('Catatan servis & perbaikan berhasil diperbarui.', 'success', 'Servis Disimpan');
     } else {
       onAddLog(logData);
+      showToast('Catatan servis & perbaikan baru berhasil ditambahkan!', 'success', 'Servis Ditambah');
     }
 
     resetForm();
@@ -955,7 +960,10 @@ export default function ServiceLogs({
                 </button>
                 <button
                   onClick={() => {
-                    if (deletingId) onDeleteLog(deletingId);
+                    if (deletingId) {
+                      onDeleteLog(deletingId);
+                      showToast('Catatan servis berhasil dihapus.', 'info', 'Dihapus');
+                    }
                     setDeletingId(null);
                   }}
                   className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-rose-600/20"
