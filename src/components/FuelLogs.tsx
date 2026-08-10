@@ -536,7 +536,20 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                   stat.color === 'blue'
                     ? 'bg-blue-50/60 dark:bg-blue-950/20 border-blue-100/60 dark:border-blue-900/30'
                     : stat.color === 'emerald'
-                {/* Tabel Riwayat BBM */}
+                      ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-100/60 dark:border-emerald-900/30'
+                      : 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-100/60 dark:border-amber-900/30'
+                }`}
+              >
+                <stat.icon className={`w-4 h-4 mx-auto mb-1 ${
+                  stat.color === 'blue' ? 'text-blue-500' : stat.color === 'emerald' ? 'text-emerald-500' : 'text-amber-500'
+                }`} />
+                <span className="block text-[10px] font-semibold tracking-wider text-slate-400">{stat.label}</span>
+                <span className="text-sm md:text-base font-extrabold text-slate-800 dark:text-white">{stat.value}</span>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* Tabel Riwayat BBM */}
           <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[700px]">
