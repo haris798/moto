@@ -125,7 +125,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
                 <div className="flex-1 min-w-0 pr-1">
                   {toast.title && (
-                    <h4 className="text-[11px] font-extrabold uppercase tracking-wider mb-0.5 opacity-80">
+                    <h4 className="text-[11px] font-extrabold capitalize tracking-wider mb-0.5 opacity-80">
                       {toast.title}
                     </h4>
                   )}
