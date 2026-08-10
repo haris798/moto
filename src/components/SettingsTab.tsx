@@ -747,68 +747,7 @@ export default function SettingsTab({
     </form>
   </div>
 
-  {/* Auto Update APK & PWA Section */}
-  <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 md:p-6 shadow-xs">
-    <div className="flex items-center gap-3 mb-4">
-      <div className="p-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
-        <RefreshCw className="w-5 h-5" />
-      </div>
-      <div>
-        <h3 className="text-base font-bold text-slate-900 dark:text-white">Pembaruan Otomatis (APK & PWA)</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Pembaruan otomatis tanpa perlu uninstall aplikasi lama</p>
-      </div>
-    </div>
 
-    <div className="space-y-4">
-      <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
-        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-        <div>
-          <span className="font-semibold block mb-0.5">Pembaruan Latar Belakang Aktif:</span>
-          Aplikasi terpasang (PWA / Web-APK) secara otomatis mengambil file dan fitur terbaru dari server tanpa menghapus data lokal atau perlu uninstall APK lama.
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800">
-        <div>
-          <span className="text-xs text-slate-400 block font-medium">Status Aplikasi:</span>
-          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Siap Auto Update (Network-First SW)
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={handleCheckAppUpdate}
-          disabled={checkingUpdate}
-          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
-          {checkingUpdate ? 'Memeriksa & Memperbarui...' : 'Perbarui Aplikasi Sekarang'}
-        </button>
-      </div>
-
-      {updateStatus && (
-        <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs flex items-center gap-2">
-          <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-          <span>{updateStatus}</span>
-        </div>
-      )}
-
-      {/* Guide for building/installing Android APK updates */}
-      <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-150 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
-        <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-          <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0" />
-          Petunjuk Update File APK Android (Satu Langkah Menimpa APK Lama):
-        </p>
-        <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-          <li>Gunakan <b>Package Name</b> (App ID) yang sama persis (misal: <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">com.motorku.app</code>).</li>
-          <li>Gunakan <b>Sertifikat / Keystore</b> tanda tangan yang sama saat men-generate file <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">.apk</code> baru.</li>
-          <li>Naikkan nilai <b>Version Code</b> pada pembuat APK (misal dari <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">1</code> ke <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">2</code>).</li>
-          <li>Saat diklik install di HP Android, OS akan otomatis mendeteksi sebagai <b>Pembaruan Aplikasi</b> dan menimpa APK lama tanpa perlu uninstall atau menghapus data.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
 </div>
   );
 }
