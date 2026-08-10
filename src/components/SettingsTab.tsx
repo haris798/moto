@@ -474,17 +474,11 @@ export default function SettingsTab({
 
       {/* 3. Supabase Cloud Sync Configuration */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs space-y-6">
-        <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-          <span className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-500" /> Supabase
+        <h3 className="text-base font-bold flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
+          <span className={`flex items-center gap-2 ${settings.supabase.connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
+            <Database className={`w-5 h-5 ${settings.supabase.connected ? 'text-emerald-500 dark:text-emerald-400' : 'text-indigo-500'}`} /> Supabase
           </span>
           <div className="flex items-center gap-1">
-            <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full mr-1 ${settings.supabase.connected
-              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
-              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
-              }`}>
-              {settings.supabase.connected ? 'Online' : 'Offline'}
-            </span>
             <input
               type="file"
               ref={supabaseFileInputRef}
@@ -591,12 +585,9 @@ export default function SettingsTab({
           />
         </div>
 
-        {dbMessage && (
-          <div className={`p-3 rounded-xl text-sm flex gap-2 border ${dbMessage.type === 'success'
-            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-150 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300'
-            : 'bg-rose-50 dark:bg-rose-950/30 border-rose-150 dark:border-rose-900/40 text-rose-800 dark:text-rose-300'
-            }`}>
-            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+        {dbMessage && dbMessage.type === 'error' && (
+          <div className="p-3 rounded-xl text-sm flex gap-2 border bg-rose-50 dark:bg-rose-950/30 border-rose-150 dark:border-rose-900/40 text-rose-800 dark:text-rose-300">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{dbMessage.text}</span>
           </div>
         )}
