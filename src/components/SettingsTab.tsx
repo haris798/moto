@@ -479,12 +479,37 @@ export default function SettingsTab({
             <Database className="w-5 h-5 text-indigo-500" /> Supabase
           </span>
           <div className="flex items-center gap-1">
-            <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${settings.supabase.connected
+            <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full mr-1 ${settings.supabase.connected
               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
               : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
               }`}>
-              {settings.supabase.connected ? 'o' : 'Offline'}
+              {settings.supabase.connected ? 'Online' : 'Offline'}
             </span>
+            <input
+              type="file"
+              ref={supabaseFileInputRef}
+              accept=".json"
+              onChange={handleImportSupabaseConfig}
+              className="hidden"
+            />
+            <button
+              id="btn-import-supabase-json"
+              type="button"
+              onClick={() => supabaseFileInputRef.current?.click()}
+              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer"
+              title="Impor seting Supabase"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+            <button
+              id="btn-export-supabase-json"
+              type="button"
+              onClick={handleExportSupabaseConfig}
+              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer"
+              title="Ekspor seting Supabase"
+            >
+              <Download className="w-4 h-4" />
+            </button>
             <button
               id="btn-test-supabase"
               type="button"
@@ -576,43 +601,7 @@ export default function SettingsTab({
           </div>
         )}
 
-        {/* Action Panel for Backup & Import Supabase Config JSON */}
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-950/50 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
-          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-            <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">Seting Supabase (JSON)</span>
-          </div>
 
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-            {/* Hidden File Input for Import */}
-            <input
-              type="file"
-              ref={supabaseFileInputRef}
-              accept=".json"
-              onChange={handleImportSupabaseConfig}
-              className="hidden"
-            />
-
-            <button
-              id="btn-import-supabase-json"
-              type="button"
-              onClick={() => supabaseFileInputRef.current?.click()}
-              className="flex-1 sm:flex-none px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-              title="Pilih & impor file JSON seting Supabase dari folder Download"
-            >
-              <Upload className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Impor
-            </button>
-
-            <button
-              id="btn-export-supabase-json"
-              type="button"
-              onClick={handleExportSupabaseConfig}
-              className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900/90 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-              title="Unduh file JSON seting Supabase ke folder Download"
-            >
-              <Download className="w-3.5 h-3.5" /> Ekspor
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 
