@@ -88,6 +88,9 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
   
   // State lokal untuk urutan
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  // State untuk paginasi
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const resetForm = () => {
     setDate(new Date().toISOString().split('T')[0]);
@@ -212,42 +215,10 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
     return sortOrder === 'desc' ? tB - tA : tA - tB;
   });
 
-  // Group logs by month
-  const groupedLogs = useMemo(() => {
-    const groups: { [key: string]: { label: string; logs: FuelLog[]; totalCost: number; totalLiters: number } } = {};
-    const groupOrder: string[] = [];
-
-    for (const log of sortedLogs) {
-      let label = 'Lainnya';
-      let key = 'other';
-      if (log.date) {
-        const dateObj = new Date(log.date.includes('T') ? log.date : `${log.date}T00:00:00`);
-        if (!isNaN(dateObj.getTime())) {
-          const monthName = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-          label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-          const y = dateObj.getFullYear();
-          const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-          key = `${y}-${m}`;
-        }
-      }
-
-      if (!groups[key]) {
-        groups[key] = { label, logs: [], totalCost: 0, totalLiters: 0 };
-        groupOrder.push(key);
-      }
-      groups[key].logs.push(log);
-      groups[key].totalCost += Number(log.cost || 0);
-      groups[key].totalLiters += Number(log.liters || 0);
-    }
-
-    return groupOrder.map(k => ({
-      key: k,
-      label: groups[k].label,
-      logs: groups[k].logs,
-      totalCost: groups[k].totalCost,
-      totalLiters: groups[k].totalLiters,
-    }));
-  }, [sortedLogs]);
+  // Paginasi
+  const totalPages = Math.ceil(sortedLogs.length / ITEMS_PER_PAGE);
+  const validCurrentPage = Math.min(Math.max(currentPage, 1), totalPages || 1);
+  const paginatedLogs = sortedLogs.slice((validCurrentPage - 1) * ITEMS_PER_PAGE, validCurrentPage * ITEMS_PER_PAGE);
 
   // Stats
   const totalFuelCost = logs.reduce((s, l) => s + l.cost, 0);
@@ -565,159 +536,112 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                   stat.color === 'blue'
                     ? 'bg-blue-50/60 dark:bg-blue-950/20 border-blue-100/60 dark:border-blue-900/30'
                     : stat.color === 'emerald'
-                      ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-100/60 dark:border-emerald-900/30'
-                      : 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-100/60 dark:border-amber-900/30'
-                }`}
-              >
-                <stat.icon className={`w-4 h-4 mx-auto mb-1 ${
-                  stat.color === 'blue' ? 'text-blue-500' : stat.color === 'emerald' ? 'text-emerald-500' : 'text-amber-500'
-                }`} />
-                <span className="block text-[10px] font-semibold tracking-wider text-slate-400">{stat.label}</span>
-                <span className="text-sm md:text-base font-extrabold text-slate-800 dark:text-white">{stat.value}</span>
-              </motion.div>
-            ))}
-          </motion.div>
-
-          {/* Cards Grouped by Month */}
-          <div className="space-y-6">
-            {groupedLogs.map((group) => (
-              <div key={group.key} className="space-y-3">
-                {/* Month Section Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                      <Calendar className="w-3.5 h-3.5" />
-                    </div>
-                    <h3 className="font-extrabold text-slate-800 dark:text-white text-xs md:text-sm tracking-wide">
-                      {group.label}
-                    </h3>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40">
-                      {group.logs.length} Entri
-                    </span>
-                  </div>
-
-                  <div className="text-right flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                    <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">{group.totalLiters.toFixed(1)} L • Subtotal:</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">
-                      {formatIDR(group.totalCost)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Cards Grid for this Month */}
-                <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {group.logs.map((log) => (
-                    <motion.div
-                      key={log.id}
-                      variants={scaleIn}
-                      whileHover={{ y: -3, transition: { duration: 0.2 } }}
-                      id={`fuel-card-${log.id}`}
-                      className="group relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20 transition-all duration-300"
-                    >
-                      {/* Gradient accent bar */}
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-60" />
-
-                      <div className="p-5">
-                        {/* Top Row */}
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 transition-transform duration-300 group-hover:scale-110">
-                              <Calendar className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <span className="text-[11px] font-medium text-slate-400">
-                                {new Date(log.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                              </span>
-                              <h4 className="font-bold text-slate-800 dark:text-white mt-0.5 text-base">
-                                {log.fuel_type}
-                              </h4>
-                            </div>
+                {/* Tabel Riwayat BBM */}
+          <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                    <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Tanggal</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Jenis BBM</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Volume (L)</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Jarak Tempuh</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Biaya</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Efisiensi / Info</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {paginatedLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                      <td className="p-4 text-sm font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        {new Date(log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="p-4 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {log.fuel_type}
+                      </td>
+                      <td className="p-4 text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        {log.liters.toLocaleString('id-ID')} L
+                      </td>
+                      <td className="p-4 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {log.efficiency && log.liters > 0
+                          ? Math.round(log.efficiency * log.liters).toLocaleString('id-ID')
+                          : log.mileage > 0
+                          ? log.mileage.toLocaleString('id-ID')
+                          : '-'} km
+                      </td>
+                      <td className="p-4 text-sm font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                        {formatIDR(log.cost)}
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        {getEfficiencyBadge(log.efficiency)}
+                        {log.notes && (
+                          <div className="text-[10px] text-slate-400 max-w-[150px] truncate mt-1 italic" title={log.notes}>
+                            &ldquo;{log.notes}&rdquo;
                           </div>
-
-                          <div className="flex gap-1.5 items-center">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              id={`btn-edit-fuel-${log.id}`}
-                              onClick={() => handleOpenEdit(log)}
-                              title="Edit Catatan"
-                              className="px-2.5 py-1.5 sm:p-1.5 text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span className="text-[11px] font-bold sm:hidden">Edit</span>
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              id={`btn-delete-fuel-${log.id}`}
-                              onClick={() => {
-                                showConfirm({
-                                  title: 'Hapus Catatan BBM',
-                                  message: 'Apakah Anda yakin ingin menghapus catatan pembelian BBM tanggal ' + (log.date || '') + '?',
-                                  confirmText: 'Ya, Hapus',
-                                  cancelText: 'Batal',
-                                  type: 'danger',
-                                  onConfirm: () => {
-                                    onDeleteLog(log.id);
-                                    showToast('Catatan BBM berhasil dihapus.', 'info', 'Dihapus');
-                                  }
-                                });
-                              }}
-                              title="Hapus Catatan"
-                              className="px-2.5 py-1.5 sm:p-1.5 text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/80 dark:border-rose-800/60 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span className="text-[11px] font-bold sm:hidden">Hapus</span>
-                            </motion.button>
-                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-right whitespace-nowrap">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(log)}
+                            className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/60 rounded-lg transition-colors cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              showConfirm({
+                                title: 'Hapus Catatan BBM',
+                                message: 'Apakah Anda yakin ingin menghapus catatan pembelian BBM tanggal ' + (log.date || '') + '?',
+                                confirmText: 'Ya, Hapus',
+                                cancelText: 'Batal',
+                                type: 'danger',
+                                onConfirm: () => {
+                                  onDeleteLog(log.id);
+                                  showToast('Catatan BBM berhasil dihapus.', 'info', 'Dihapus');
+                                }
+                              });
+                            }}
+                            className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 dark:text-rose-400 dark:bg-rose-900/30 dark:hover:bg-rose-900/60 rounded-lg transition-colors cursor-pointer"
+                            title="Hapus"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-
-                        {/* Metrics */}
-                        <div className="grid grid-cols-3 gap-3 mt-4 py-3 border-y border-slate-50 dark:border-slate-800/40">
-                          <div className="text-center">
-                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Volume</span>
-                            <div className="flex items-baseline justify-center gap-0.5">
-                              <span className="text-sm font-extrabold text-slate-800 dark:text-white">{log.liters.toLocaleString('id-ID')}</span>
-                              <span className="text-[10px] text-slate-400">L</span>
-                            </div>
-                          </div>
-                          <div className="text-center">
-                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Jarak Tempuh</span>
-                            <div className="flex items-baseline justify-center gap-0.5">
-                              <span className="text-sm font-extrabold text-slate-800 dark:text-white">
-                                {log.efficiency && log.liters > 0
-                                  ? Math.round(log.efficiency * log.liters).toLocaleString('id-ID')
-                                  : log.mileage > 0
-                                  ? log.mileage.toLocaleString('id-ID')
-                                  : '-'}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                {(log.efficiency && log.liters > 0) || log.mileage > 0 ? 'km' : ''}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-center">
-                            <span className="block text-[10px] font-semibold tracking-wider text-slate-400 mb-0.5">Biaya</span>
-                            <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{formatIDR(log.cost)}</span>
-                          </div>
-                        </div>
-
-                        {/* Bottom Row */}
-                        <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-                          {getEfficiencyBadge(log.efficiency)}
-                          {log.notes && (
-                            <span className="text-[11px] text-slate-400 max-w-[50%] truncate italic" title={log.notes}>
-                              &ldquo;{log.notes}&rdquo;
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
+                      </td>
+                    </tr>
                   ))}
-                </motion.div>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  Halaman <span className="font-bold">{validCurrentPage}</span> dari <span className="font-bold">{totalPages}</span>
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={validCurrentPage === 1}
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={validCurrentPage === totalPages}
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </motion.div>
         </>
       )}
     </motion.div>
