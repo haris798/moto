@@ -152,6 +152,11 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
     .reduce((sum, l) => sum + l.cost, 0);
   const currentMonthTotalCost = currentMonthFuelCost + currentMonthServiceCost;
 
+  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const lastMonthFuelCost = fuelLogs
+    .filter(l => new Date(l.date).getMonth() === lastMonth.getMonth() && new Date(l.date).getFullYear() === lastMonth.getFullYear())
+    .reduce((sum, l) => sum + l.cost, 0);
+
   // Monthly chart data
   const monthlyDataMap = new Map<string, { month: string; fuel: number; fuelLiters: number; oil: number; service: number }>();
   for (let i = 5; i >= 0; i--) {
@@ -468,10 +473,10 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
           {/* Mini stats row */}
           <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: Timer, label: 'Total Catatan', value: `${oilLogs.length + fuelLogs.length + serviceLogs.length} log` },
+              { icon: Milestone, label: 'Total Jarak Bulan Ini', value: `${thisMonthKm.toLocaleString('id-ID')} km` },
               { icon: Target, label: 'Konsumsi BBM', value: avgEfficiency > 0 ? `${avgEfficiency.toFixed(1)} km/L` : '-' },
-              { icon: Flame, label: 'Total Biaya BBM', value: formatIDR(totalFuelCost) },
-              { icon: Wrench, label: 'Total Servis', value: `${serviceLogs.length}x servis` },
+              { icon: Flame, label: 'Total BBM Bulan ini', value: formatIDR(currentMonthFuelCost) },
+              { icon: Timer, label: 'Total BBM Bulan lalu', value: formatIDR(lastMonthFuelCost) },
             ].map((item, i) => (
               <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                 <div className="flex items-center gap-2 text-indigo-200/70 text-[11px] font-medium tracking-wider mb-1">
@@ -486,35 +491,8 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
       </motion.div>
 
       {/* ═══════════════════════ 1.5 KARTU RINGKASAN KESEHATAN MOTOR ═══════════════════════ */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 md:gap-4">
-        {/* Card 1: Total Biaya Servis 30 Hari Terakhir */}
-        <motion.div
-          whileHover={{ y: -2 }}
-          onClick={() => onNavigate('service')}
-          className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 md:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-indigo-600" />
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold capitalize tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5 text-indigo-500" />
-                Total Biaya Servis
-              </span>
-              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display">
-                {formatIDR(serviceCost30Days)}
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                <CalendarDays className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>{serviceCount30Days > 0 ? `${serviceCount30Days}x servis dalam 30` : 'Belum ada servis'}</span>
-              </p>
-            </div>
-            <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shrink-0 group-hover:scale-110 transition-transform">
-              <Coins className="w-6 h-6" />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Card 2: Jarak Tempuh Total Sejak Ganti Oli */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-3.5 md:gap-4">
+        {/* Card 1: Jarak Tempuh Total Sejak Ganti Oli */}
         <motion.div
           whileHover={{ y: -2 }}
           onClick={() => onNavigate('oil')}
@@ -1086,9 +1064,6 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                 </div>
                 Pengeluaran Bulanan
               </h3>
-              <span className="text-xs text-slate-400 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-lg font-medium">
-                6 bulan terakhir
-              </span>
             </div>
             <p className="text-xs text-slate-400">Biaya BBM dan servis oli per bulan</p>
           </div>
@@ -1139,59 +1114,6 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
         </motion.div>
       </div>
 
-      {/* ═══════════════════════ 5. TREN PENGGUNAAN BBM (LITER) ═══════════════════════ */}
-      <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-sm mt-4 md:mt-5">
-        <div className="p-5 pb-2">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
-                <Fuel className="w-4 h-4" />
-              </div>
-              Tren Penggunaan BBM
-            </h3>
-            <span className="text-xs text-slate-400 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-lg font-medium">
-              6 bulan terakhir
-            </span>
-          </div>
-          <p className="text-xs text-slate-400">Total volume bahan bakar (liter) per bulan</p>
-        </div>
-
-        <div className="h-64 md:h-72 w-full px-2 pb-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={sortedMonthlyData} margin={{ top: 10, right: 10, left: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" className="dark:hidden" strokeOpacity={0.6} />
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" className="hidden dark:block" strokeOpacity={0.3} />
-              <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} stroke="#cbd5e1" className="dark:stroke-slate-800" />
-              <YAxis
-                tick={{ fill: '#94a3b8', fontSize: 11 }}
-                stroke="#cbd5e1"
-                className="dark:stroke-slate-800"
-                tickFormatter={(v) => `${v} L`}
-              />
-              <Tooltip
-                formatter={(value: any) => [`${Number(value).toFixed(1)} Liter`, '']}
-                contentStyle={chartTooltipStyle}
-                labelStyle={{ fontWeight: 'bold', color: '#cbd5e1', marginBottom: 6 }}
-                itemStyle={{ padding: '2px 0' }}
-              />
-              <Legend
-                iconType="circle"
-                wrapperStyle={{ paddingTop: '12px', fontSize: '12px' }}
-              />
-              <Bar
-                dataKey="fuelLiters"
-                name="Volume BBM"
-                fill="#0ea5e9"
-                radius={[6, 6, 0, 0]}
-                maxBarSize={48}
-                animationDuration={1200}
-                animationEasing="ease-out"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.div>
-
       {/* ═══════════════════════ 6. FUEL EFFICIENCY & CONSUMPTION TREND ═══════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 mt-4 md:mt-5">
         {/* ── Fuel Efficiency & Consumption Trend Chart (2 columns) ── */}
@@ -1203,12 +1125,9 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                   <TrendingUp className="w-4 h-4" />
                 </div>
                 <h3 className="font-bold text-slate-800 dark:text-white">
-                  Grafik Konsumsi & Efisiensi BBM
+                  Grafik Efisiensi BBM
                 </h3>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Tren performa bahan bakar per kilometer (12 pengisian terakhir)
-              </p>
             </div>
 
             {/* Metric Mode Switcher */}
@@ -1412,7 +1331,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
                 <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
-                  KONSUMSI / 100 KM
+                  Konsumsi / 100 KM
                 </span>
                 <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
                   {avgEfficiency > 0 ? `${(100 / avgEfficiency).toFixed(2)} L` : '—'}
@@ -1422,7 +1341,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
                 <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
-                  BIAYA PER KM
+                  Biaya per KM
                 </span>
                 <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
                   {avgEfficiency > 0 ? `Rp ${(settings.fuelPricePerLiter / avgEfficiency).toFixed(0)}` : '—'}
@@ -1432,7 +1351,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
                 <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
-                  JARAK / TANGKI (4L)
+                  Jarak / Tangki (4L)
                 </span>
                 <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
                   {avgEfficiency > 0 ? `${(4 * avgEfficiency).toFixed(0)} km` : '—'}
@@ -1442,7 +1361,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
                 <span className="text-[10px] font-semibold text-slate-400 tracking-wider block mb-1">
-                  EST. BIAYA 100 KM
+                  Est. Biaya 100 KM
                 </span>
                 <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
                   {avgEfficiency > 0 ? formatIDR((100 / avgEfficiency) * (settings.fuelPricePerLiter || 10000)) : '—'}
@@ -1451,19 +1370,8 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
               </div>
             </div>
           </div>
-
-          {/* Efficiency Optimization Note */}
-          <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs flex items-start gap-2.5">
-            <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-            <p className="text-indigo-900 dark:text-indigo-200 leading-relaxed text-[11px]">
-              <strong>Tips Hemat BBM:</strong> Menjaga tekanan angin ban ideal (29-33 PSI) dan rantai terlumasi dengan baik dapat menghemat konsumsi BBM hingga 10-15%.
-            </p>
-          </div>
         </motion.div>
       </div>
-
-      {/* ═══════════════════════ FOOTER SPACER ═══════════════════════ */}
-      <div className="h-2" />
     </motion.div>
   );
 }

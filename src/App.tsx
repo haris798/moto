@@ -484,7 +484,7 @@ export default function App() {
   }, [isOnline, user, settings.supabase.connected]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 transition-colors duration-300 flex flex-col md:flex-row overflow-hidden pb-16 md:pb-0">
+    <div className="h-[100dvh] bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 transition-colors duration-300 flex flex-col md:flex-row overflow-hidden">
 
       {/* 1. Desktop Sidebar (md and larger) */}
       <aside className="hidden md:flex w-64 border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex-col shrink-0 h-screen sticky top-0 justify-between select-none">
@@ -581,7 +581,7 @@ export default function App() {
       </aside>
 
       {/* 2. Main Area Panel */}
-      <div className="flex-1 flex flex-col h-screen overflow-y-auto min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
 
         {/* Mobile Header (md and smaller) */}
         <header className="sticky top-0 z-45 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800/80 transition-colors md:hidden shrink-0 pt-[env(safe-area-inset-top)]">
@@ -720,7 +720,7 @@ export default function App() {
         </header>
 
         {/* 3. Main Stage Container */}
-        <main className="flex-1 p-6 sm:p-8 pb-28 md:pb-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-6 sm:p-8 pb-16 md:pb-8 max-w-7xl w-full mx-auto space-y-6">
           {activeTab === 'dashboard' && (
             <Dashboard
               oilLogs={oilLogs}

@@ -377,21 +377,42 @@ export default function SettingsTab({
           <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <Calendar className="w-5 h-5 text-indigo-500" /> Ganti Oli
           </h3>
-          <button
-            id="btn-save-intervals"
-            type="button"
-            onClick={handleSaveIntervals}
-            className="p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer"
-            title="Simpan Pengaturan"
-          >
-            <Save className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              id="btn-download-backup"
+              type="button"
+              onClick={handleDownloadBackup}
+              className="p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              title="Download Backup JSON"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            <button
+              id="btn-sync-now"
+              type="button"
+              onClick={onTriggerSync}
+              disabled={syncStatus.isSyncing || !settings.supabase.connected || !user}
+              className={`p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${syncStatus.isSyncing ? 'animate-spin text-indigo-500' : ''}`}
+              title="Sinkronisasi Cloud"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            <button
+              id="btn-save-intervals"
+              type="button"
+              onClick={handleSaveIntervals}
+              className="p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer"
+              title="Simpan Pengaturan"
+            >
+              <Save className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        <form className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <form className="grid grid-cols-3 gap-2 sm:gap-6">
           <div>
-            <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Berdasarkan Jarak (km)
+            <label className="block text-[10px] sm:text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5 truncate">
+              Jarak (Km)
             </label>
             <div className="relative">
               <input
@@ -400,19 +421,18 @@ export default function SettingsTab({
                 required
                 value={intervalKm}
                 onChange={(e) => setIntervalKm(Number(e.target.value))}
-                placeholder="Contoh: 1000"
-                className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold"
+                placeholder="2000"
+                className="w-full py-2 sm:py-2.5 pl-2 sm:pl-3 pr-7 sm:pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-xs sm:text-sm font-semibold"
               />
-              <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-sm font-bold text-slate-400 pointer-events-none">
+              <span className="absolute inset-y-0 right-0 flex items-center pr-2 sm:pr-4 text-[10px] sm:text-sm font-bold text-slate-400 pointer-events-none">
                 KM
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5">Rekomendasi umum ganti oli motor adalah setiap <b>1.000 km - 3.000 km</b>.</p>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Berdasarkan Waktu (Hari)
+            <label className="block text-[10px] sm:text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5 truncate">
+              Waktu (Hari)
             </label>
             <div className="relative">
               <input
@@ -421,19 +441,18 @@ export default function SettingsTab({
                 required
                 value={intervalDays}
                 onChange={(e) => setIntervalDays(Number(e.target.value))}
-                placeholder="Contoh: 90"
-                className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold"
+                placeholder="90"
+                className="w-full py-2 sm:py-2.5 pl-2 sm:pl-3 pr-8 sm:pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-xs sm:text-sm font-semibold"
               />
-              <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-sm font-bold text-slate-400 pointer-events-none">
+              <span className="absolute inset-y-0 right-0 flex items-center pr-2 sm:pr-4 text-[10px] sm:text-sm font-bold text-slate-400 pointer-events-none">
                 Hari
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5">Disarankan ganti oli maksimal setiap <b>90 hari</b> (3 bulan) meski jarak belum tercapai.</p>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Harga BBM per Liter (Pertalite)
+            <label className="block text-[10px] sm:text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5 truncate">
+              Harga BBM/L
             </label>
             <div className="relative">
               <input
@@ -442,85 +461,45 @@ export default function SettingsTab({
                 required
                 value={fuelPrice}
                 onChange={(e) => setFuelPrice(Number(e.target.value))}
-                placeholder="Contoh: 10000"
-                className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold"
+                placeholder="10000"
+                className="w-full py-2 sm:py-2.5 pl-2 sm:pl-3 pr-7 sm:pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-xs sm:text-sm font-semibold"
               />
-              <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-[12px] font-bold text-slate-400 pointer-events-none">
-                Rp/L
+              <span className="absolute inset-y-0 right-0 flex items-center pr-2 sm:pr-4 text-[10px] sm:text-[12px] font-bold text-slate-400 pointer-events-none">
+                Rp
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5"> (Default Pertalite: Rp 10.000/L).</p>
           </div>
         </form>
-      </div>
-
-      {/* 2.5 Backup & Data Export Card */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
-        <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-          <Download className="w-5 h-5 text-indigo-500" /> BackUp Data
-        </h3>
-
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/60">
-          <div className="space-y-1">
-            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">File Cadangan Motor.ku</h4>
-            <p className="text-[12px] text-slate-400">
-              Total catatan: <span className="font-bold text-slate-700 dark:text-slate-300">{oilLogs.length} Ganti Oli</span> dan <span className="font-bold text-slate-700 dark:text-slate-300">{fuelLogs.length} BBM</span>
-            </p>
-          </div>
-          <button
-            id="btn-download-backup"
-            type="button"
-            onClick={handleDownloadBackup}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs self-stretch sm:self-auto justify-center"
-          >
-            <Download className="w-4 h-4" /> Download JSON
-          </button>
-        </div>
       </div>
 
       {/* 3. Supabase Cloud Sync Configuration */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs space-y-6">
         <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
           <span className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-500" /> Sinkronisasi
+            <Database className="w-5 h-5 text-indigo-500" /> Supabase
           </span>
-          <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${settings.supabase.connected
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
-            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
-            }`}>
-            {settings.supabase.connected ? 'Supa' : 'Offline'}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${settings.supabase.connected
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
+              }`}>
+              {settings.supabase.connected ? 'o' : 'Offline'}
+            </span>
+            <button
+              id="btn-test-supabase"
+              type="button"
+              onClick={handleConnectSupabase}
+              disabled={dbConnecting}
+              className={`p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer disabled:opacity-50`}
+              title="Simpan & Hubungkan Database"
+            >
+              {dbConnecting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            </button>
+          </div>
         </h3>
 
-        <div>
-          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Data Offline Pending</h4>
-          <div className="mt-2 space-y-2">
-            <p className="text-sm text-slate-500">
-              Data lokal belum tersinkron: <b className="text-indigo-600 dark:text-indigo-400">{syncStatus.pendingSyncCount} baris</b>
-            </p>
-            {syncStatus.lastSyncedAt && (
-              <p className="text-[12px] text-slate-400">
-                Sinkronisasi terakhir: {new Date(syncStatus.lastSyncedAt).toLocaleTimeString('id-ID')}
-              </p>
-            )}
-            <button
-              id="btn-sync-now"
-              onClick={onTriggerSync}
-              disabled={syncStatus.isSyncing || !settings.supabase.connected || !user}
-              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-bold rounded-lg text-sm flex items-center gap-1 disabled:opacity-50 cursor-pointer transition-all"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${syncStatus.isSyncing ? 'animate-spin text-indigo-500' : ''}`} />
-              {syncStatus.isSyncing ? 'Menyinkronkan...' : 'Sinkronisasikan Sekarang'}
-            </button>
-            {!user && settings.supabase.connected && (
-              <p className="text-[11px] text-amber-500">Silakan masuk akun terlebih dahulu untuk melakukan sinkronisasi.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Credentials Inputs */}
-      <div className="space-y-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+      <div className="space-y-4 pt-1">
         <div>
           <label className="block text-[13px] font-bold tracking-widest text-slate-400 mb-2">
             Supabase Project URL
@@ -600,8 +579,7 @@ export default function SettingsTab({
         {/* Action Panel for Backup & Import Supabase Config JSON */}
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-950/50 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
           <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-            <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">Cadangan Seting Supabase (JSON)</span>
-            <span>Ekspor / impor file JSON kredensial ke folder Download hp/komputer Anda</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">Seting Supabase (JSON)</span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
@@ -621,7 +599,7 @@ export default function SettingsTab({
               className="flex-1 sm:flex-none px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               title="Pilih & impor file JSON seting Supabase dari folder Download"
             >
-              <Upload className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Impor JSON
+              <Upload className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Impor
             </button>
 
             <button
@@ -631,31 +609,12 @@ export default function SettingsTab({
               className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900/90 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               title="Unduh file JSON seting Supabase ke folder Download"
             >
-              <Download className="w-3.5 h-3.5" /> Ekspor JSON
+              <Download className="w-3.5 h-3.5" /> Ekspor
             </button>
           </div>
         </div>
-
-        <div className="flex justify-end gap-3 pt-1">
-          <button
-            id="btn-test-supabase"
-            type="button"
-            onClick={handleConnectSupabase}
-            disabled={dbConnecting}
-            className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-indigo-500/20"
-          >
-            {dbConnecting ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menghubungkan...
-              </>
-            ) : (
-              <>
-                <Database className="w-3.5 h-3.5" /> Simpan & Hubungkan Database
-              </>
-            )}
-          </button>
-        </div>
       </div>
+    </div>
 
       {/* 4. Telegram Alert Configurations */ }
   <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
@@ -870,6 +829,6 @@ export default function SettingsTab({
       </div>
     </div>
   </div>
-    </div >
+</div>
   );
 }
