@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { OilLog, FuelLog, AppSettings, SyncStatus } from './types';
+import { OilLog, FuelLog, ServiceLog, AppSettings, SyncStatus } from './types';
 import { getSupabaseClient, syncWithSupabase } from './lib/supabaseClient';
+import { initIndexedDB, getDBItem, setDBItem, removeDBItem } from './lib/dbStorage';
 import { checkAndSendOilAlert } from './utils/telegram';
 import { exportToCSV, exportToPDF } from './utils/export';
 import { generateUUID } from './utils/uuid';
+import { useToast } from './components/ToastContainer';
 import Dashboard from './components/Dashboard';
 import OilLogs from './components/OilLogs';
 import FuelLogs from './components/FuelLogs';
+import ServiceLogs from './components/ServiceLogs';
 import SettingsTab from './components/SettingsTab';
 import {
-  Gauge, Droplets, Fuel, Settings, Cloud, CloudOff, FileSpreadsheet, FileText, RefreshCw,
+  Gauge, Droplets, Fuel, Wrench, Settings, Cloud, CloudOff, FileSpreadsheet, FileText, RefreshCw,
   Sun, Moon, LogOut
 } from 'lucide-react';
 
@@ -33,9 +36,13 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export default function App() {
-  // 1. Core States
+  const { showToast, showConfirm } = useToast();
+
+  // 1. State Inti (Core States)
+  // Menyimpan data riwayat oli, BBM, servis, pengaturan, status user, dan state UI
   const [oilLogs, setOilLogs] = useState<OilLog[]>([]);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [serviceLogs, setServiceLogs] = useState<ServiceLog[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null);
 
@@ -43,70 +50,65 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Sync state tracking
+  // Status sinkronisasi ke cloud database (Supabase)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     lastSyncedAt: null,
     pendingSyncCount: 0,
     isSyncing: false,
   });
-  const [syncProgressMsg, setSyncProgressMsg] = useState<string>('');
 
   const tabsList = [
     { id: 'dashboard', label: 'Dashboard', icon: Gauge },
-    { id: 'oil', label: 'Ganti Oli', icon: Droplets },
-    { id: 'fuel', label: 'BBM & Efisiensi', icon: Fuel },
+    { id: 'fuel', label: 'BBM', icon: Fuel },
+    { id: 'oil', label: 'Oli', icon: Droplets },
+    { id: 'service', label: 'Servis', icon: Wrench },
     { id: 'settings', label: 'Pengaturan', icon: Settings },
   ];
 
-  // 2. Load cached data on mount
+  // 2. Inisialisasi Data pada saat komponen dimuat (Mount)
+  // Memuat pengaturan dan log yang tersimpan di IndexedDB (Offline-First)
   useEffect(() => {
-    // A. Load Local Settings
-    const cachedSettings = localStorage.getItem('oil_tracker_settings');
-    let loadedSettings = DEFAULT_SETTINGS;
-    if (cachedSettings) {
-      try {
-        const parsed = JSON.parse(cachedSettings);
-        loadedSettings = { ...DEFAULT_SETTINGS, ...parsed };
+    async function loadInitialData() {
+      await initIndexedDB();
+
+      // A. Memuat pengaturan lokal
+      const cachedSettings = await getDBItem<AppSettings | null>('oil_tracker_settings', null);
+      let loadedSettings = DEFAULT_SETTINGS;
+      if (cachedSettings) {
+        loadedSettings = { ...DEFAULT_SETTINGS, ...cachedSettings };
         setSettings(loadedSettings);
-      } catch (e) {
-        console.error('Error loading settings from cache', e);
       }
-    }
 
-    // B. Load Logs
-    const cachedOil = localStorage.getItem('oil_tracker_oil_logs');
-    if (cachedOil) {
-      try {
-        setOilLogs(JSON.parse(cachedOil));
-      } catch (e) { }
-    }
+      // B. Memuat Riwayat Oli, BBM, dan Servis
+      const cachedOil = await getDBItem<OilLog[]>('oil_tracker_oil_logs', []);
+      setOilLogs(cachedOil);
 
-    const cachedFuel = localStorage.getItem('oil_tracker_fuel_logs');
-    if (cachedFuel) {
-      try {
-        setFuelLogs(JSON.parse(cachedFuel));
-      } catch (e) { }
-    }
+      const cachedFuel = await getDBItem<FuelLog[]>('oil_tracker_fuel_logs', []);
+      setFuelLogs(cachedFuel);
 
-    // C. Setup Theme
-    const isDark = loadedSettings.theme === 'dark' || localStorage.getItem('oil_tracker_theme') === 'dark';
-    setDarkMode(isDark);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+      const cachedService = await getDBItem<ServiceLog[]>('oil_tracker_service_logs', []);
+      setServiceLogs(cachedService);
 
-    // D. Fetch Supabase User Session if configured
-    const client = getSupabaseClient();
-    if (client) {
-      client.auth.getUser().then(async ({ data: { user: sbUser } }) => {
+      // C. Konfigurasi Tema (Terang/Gelap)
+      const themeVal = await getDBItem<string>('oil_tracker_theme', 'light');
+      const isDark = loadedSettings.theme === 'dark' || themeVal === 'dark';
+      setDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
+      // D. Mengecek sesi pengguna di Supabase jika sudah login
+      const client = getSupabaseClient();
+      if (client) {
+        const { data: { user: sbUser } } = await client.auth.getUser();
         if (sbUser) {
           setUser(sbUser);
         } else {
           // Auto-login using saved credentials if available
-          const savedEmail = localStorage.getItem('supabase_email');
-          const savedPassword = localStorage.getItem('supabase_password');
+          const savedEmail = await getDBItem<string>('supabase_email', '');
+          const savedPassword = await getDBItem<string>('supabase_password', '');
 
           if (savedEmail && savedPassword) {
             try {
@@ -124,9 +126,13 @@ export default function App() {
             }
           }
         }
-      });
+      }
+    }
 
-      // Listen for auth state changes
+    loadInitialData();
+
+    const client = getSupabaseClient();
+    if (client) {
       const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
         if (session?.user) {
           setUser(session.user);
@@ -143,18 +149,16 @@ export default function App() {
 
   // Update pending sync count whenever logs change or deletions are queued
   useEffect(() => {
-    let deletedIds: string[] = [];
-    try {
-      const parsed = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
-      if (Array.isArray(parsed)) deletedIds = parsed;
-    } catch (e) {}
-    setSyncStatus(prev => ({
-      ...prev,
-      pendingSyncCount: deletedIds.length
-    }));
+    getDBItem<string[]>('deleted_log_ids', []).then(deletedIds => {
+      setSyncStatus(prev => ({
+        ...prev,
+        pendingSyncCount: Array.isArray(deletedIds) ? deletedIds.length : 0
+      }));
+    });
   }, [oilLogs, fuelLogs]);
 
-  // 3. Online/Offline events
+  // 3. Listener Status Jaringan (Online/Offline)
+  // Membantu untuk menunda atau mengaktifkan sinkronisasi Supabase secara otomatis
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -174,7 +178,8 @@ export default function App() {
     };
   }, [settings.supabase.connected, user, oilLogs, fuelLogs]);
 
-  // 4. Periodically check for Telegram Alerts on app load / log updates
+  // 4. Pengecekan Peringatan Telegram
+  // Akan diperiksa secara periodik atau setelah pembaruan log untuk mengirimkan notifikasi
   useEffect(() => {
     if (settings.telegram.enabled && oilLogs.length > 0) {
       const maxOilMileage = Math.max(...oilLogs.map(l => l.mileage));
@@ -202,101 +207,126 @@ export default function App() {
             }
           };
           setSettings(updated);
-          localStorage.setItem('oil_tracker_settings', JSON.stringify(updated));
+          setDBItem('oil_tracker_settings', updated);
         }
       });
     }
   }, [oilLogs, fuelLogs, settings.telegram.enabled]);
 
   // 5. Global Actions
-  const handleUpdateSettings = useCallback((newSettings: AppSettings) => {
+  const handleUpdateSettings = useCallback(async (newSettings: AppSettings) => {
     setSettings(newSettings);
-    localStorage.setItem('oil_tracker_settings', JSON.stringify(newSettings));
+    await setDBItem('oil_tracker_settings', newSettings);
 
     // Also save credentials directly for client initialization helper
     if (newSettings.supabase.url && newSettings.supabase.anonKey) {
-      localStorage.setItem('supabase_url', newSettings.supabase.url);
-      localStorage.setItem('supabase_anon_key', newSettings.supabase.anonKey);
+      await setDBItem('supabase_url', newSettings.supabase.url);
+      await setDBItem('supabase_anon_key', newSettings.supabase.anonKey);
     }
   }, []);
 
-  const handleToggleDarkMode = useCallback(() => {
+  const handleToggleDarkMode = useCallback(async () => {
     setDarkMode(prev => {
       const nextDark = !prev;
       if (nextDark) {
         document.documentElement.classList.add('dark');
-        localStorage.setItem('oil_tracker_theme', 'dark');
+        setDBItem('oil_tracker_theme', 'dark');
       } else {
         document.documentElement.classList.remove('dark');
-        localStorage.setItem('oil_tracker_theme', 'light');
+        setDBItem('oil_tracker_theme', 'light');
       }
       return nextDark;
     });
   }, []);
 
   // Perform full database cloud sync
-  const handleTriggerSync = useCallback(async (customOilLogs?: OilLog[], customFuelLogs?: FuelLog[]) => {
+  const handleTriggerSync = useCallback(async (
+    customOilLogs?: OilLog[],
+    customFuelLogs?: FuelLog[],
+    customServiceLogs?: ServiceLog[],
+    isInteractive: boolean = false
+  ) => {
     if (!isOnline) {
-      alert('Tidak ada koneksi internet. Sinkronisasi ditunda.');
+      if (isInteractive) {
+        showToast('Tidak ada koneksi internet. Sinkronisasi ditunda.', 'warning', 'Koneksi Terputus');
+      }
       return;
     }
     setSyncStatus(prev => ({ ...prev, isSyncing: true }));
-    setSyncProgressMsg('Menghubungkan ke Supabase...');
 
     try {
       const logsToSyncOil = customOilLogs || oilLogs;
       const logsToSyncFuel = customFuelLogs || fuelLogs;
-      const result = await syncWithSupabase(logsToSyncOil, logsToSyncFuel, (progress) => {
-        setSyncProgressMsg(progress);
-      });
+      const logsToSyncService = customServiceLogs || serviceLogs;
+      const result = await syncWithSupabase(logsToSyncOil, logsToSyncFuel, undefined, logsToSyncService);
 
       if (result.success) {
         // Update local logs with merged data
         setOilLogs(result.syncedOilLogs);
         setFuelLogs(result.syncedFuelLogs);
+        if (result.syncedServiceLogs) {
+          setServiceLogs(result.syncedServiceLogs);
+          await setDBItem('oil_tracker_service_logs', result.syncedServiceLogs);
+        }
+        if (result.syncedJarakRecords) {
+          await setDBItem('oil_tracker_jarak', result.syncedJarakRecords);
+        }
 
-        localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(result.syncedOilLogs));
-        localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(result.syncedFuelLogs));
+        await setDBItem('oil_tracker_oil_logs', result.syncedOilLogs);
+        await setDBItem('oil_tracker_fuel_logs', result.syncedFuelLogs);
 
         setSyncStatus({
           lastSyncedAt: new Date().toISOString(),
           pendingSyncCount: 0,
           isSyncing: false
         });
-        setSyncProgressMsg('Sinkronisasi selesai!');
-        setTimeout(() => setSyncProgressMsg(''), 3000);
+
+        if (isInteractive) {
+          showToast('Sinkronisasi data cloud berhasil!', 'success', 'Sinkron Selesai');
+        }
       } else {
         setSyncStatus(prev => ({ ...prev, isSyncing: false }));
-        setSyncProgressMsg('');
-        alert(result.message);
+        if (isInteractive) {
+          showToast(result.message, 'error', 'Gagal Sinkron');
+        }
       }
     } catch (e: any) {
       setSyncStatus(prev => ({ ...prev, isSyncing: false }));
-      setSyncProgressMsg('');
-      alert(`Gagal sinkronisasi: ${e.message || e}`);
+      if (isInteractive) {
+        showToast(`Gagal sinkronisasi: ${e.message || e}`, 'error', 'Gagal Sinkron');
+      }
     }
-  }, [isOnline, oilLogs, fuelLogs, settings.supabase.connected]);
+  }, [isOnline, oilLogs, fuelLogs, serviceLogs, settings.supabase.connected, showToast]);
 
   const handleLogout = async () => {
-    const client = getSupabaseClient();
-    if (client) {
-      await client.auth.signOut();
-      setUser(null);
-      // Clean supabase keys from settings on logout to ensure safety
-      const clearedSettings = {
-        ...settings,
-        supabase: { url: '', anonKey: '', connected: false }
-      };
-      setSettings(clearedSettings);
-      localStorage.removeItem('supabase_url');
-      localStorage.removeItem('supabase_anon_key');
-      localStorage.setItem('oil_tracker_settings', JSON.stringify(clearedSettings));
-      alert('Anda telah keluar dari akun cloud.');
-    }
+    showConfirm({
+      title: 'Keluar dari Cloud',
+      message: 'Apakah Anda yakin ingin keluar dari akun cloud Supabase?',
+      confirmText: 'Ya, Keluar',
+      cancelText: 'Batal',
+      type: 'warning',
+      onConfirm: async () => {
+        const client = getSupabaseClient();
+        if (client) {
+          await client.auth.signOut();
+          setUser(null);
+          // Clean supabase keys from settings on logout to ensure safety
+          const clearedSettings = {
+            ...settings,
+            supabase: { url: '', anonKey: '', connected: false }
+          };
+          setSettings(clearedSettings);
+          await removeDBItem('supabase_url');
+          await removeDBItem('supabase_anon_key');
+          await setDBItem('oil_tracker_settings', clearedSettings);
+          showToast('Anda telah keluar dari akun cloud.', 'info', 'Logout');
+        }
+      }
+    });
   };
 
   // Log handlers
-  const handleAddOilLog = (logData: Omit<OilLog, 'id'>) => {
+  const handleAddOilLog = async (logData: Omit<OilLog, 'id'>) => {
     const newLog: OilLog = {
       ...logData,
       id: generateUUID(),
@@ -305,14 +335,14 @@ export default function App() {
     };
     const updated = [newLog, ...oilLogs];
     setOilLogs(updated);
-    localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_oil_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(updated, undefined);
     }
   };
 
-  const handleEditOilLog = (id: string, updatedData: Partial<OilLog>) => {
+  const handleEditOilLog = async (id: string, updatedData: Partial<OilLog>) => {
     const updated = oilLogs.map(log => {
       if (log.id === id) {
         return {
@@ -324,29 +354,29 @@ export default function App() {
       return log;
     });
     setOilLogs(updated);
-    localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_oil_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(updated, undefined);
     }
   };
 
-  const handleDeleteOilLog = (id: string) => {
+  const handleDeleteOilLog = async (id: string) => {
     const updated = oilLogs.filter(log => log.id !== id);
     setOilLogs(updated);
-    localStorage.setItem('oil_tracker_oil_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_oil_logs', updated);
 
     // Queue deletion id
-    const deletedIds: string[] = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
+    const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
-    localStorage.setItem('deleted_log_ids', JSON.stringify(deletedIds));
+    await setDBItem('deleted_log_ids', deletedIds);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(updated, undefined);
     }
   };
 
-  const handleAddFuelLog = (logData: Omit<FuelLog, 'id'>) => {
+  const handleAddFuelLog = async (logData: Omit<FuelLog, 'id'>) => {
     const newLog: FuelLog = {
       ...logData,
       id: generateUUID(),
@@ -355,14 +385,14 @@ export default function App() {
     };
     const updated = [newLog, ...fuelLogs];
     setFuelLogs(updated);
-    localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_fuel_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, updated);
     }
   };
 
-  const handleEditFuelLog = (id: string, updatedData: Partial<FuelLog>) => {
+  const handleEditFuelLog = async (id: string, updatedData: Partial<FuelLog>) => {
     const updated = fuelLogs.map(log => {
       if (log.id === id) {
         return {
@@ -374,25 +404,75 @@ export default function App() {
       return log;
     });
     setFuelLogs(updated);
-    localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_fuel_logs', updated);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, updated);
     }
   };
 
-  const handleDeleteFuelLog = (id: string) => {
+  const handleDeleteFuelLog = async (id: string) => {
     const updated = fuelLogs.filter(log => log.id !== id);
     setFuelLogs(updated);
-    localStorage.setItem('oil_tracker_fuel_logs', JSON.stringify(updated));
+    await setDBItem('oil_tracker_fuel_logs', updated);
 
     // Queue deletion id
-    const deletedIds: string[] = JSON.parse(localStorage.getItem('deleted_log_ids') || '[]');
+    const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
-    localStorage.setItem('deleted_log_ids', JSON.stringify(deletedIds));
+    await setDBItem('deleted_log_ids', deletedIds);
 
     if (settings.supabase.connected && user) {
       handleTriggerSync(undefined, updated);
+    }
+  };
+
+  const handleAddServiceLog = async (logData: Omit<ServiceLog, 'id'>) => {
+    const newLog: ServiceLog = {
+      ...logData,
+      id: generateUUID(),
+      user_id: user?.id,
+      updated_at: new Date().toISOString()
+    };
+    const updated = [newLog, ...serviceLogs];
+    setServiceLogs(updated);
+    await setDBItem('oil_tracker_service_logs', updated);
+
+    if (settings.supabase.connected && user) {
+      handleTriggerSync(undefined, undefined, updated);
+    }
+  };
+
+  const handleEditServiceLog = async (id: string, updatedData: Partial<ServiceLog>) => {
+    const updated = serviceLogs.map(log => {
+      if (log.id === id) {
+        return {
+          ...log,
+          ...updatedData,
+          updated_at: new Date().toISOString()
+        };
+      }
+      return log;
+    });
+    setServiceLogs(updated);
+    await setDBItem('oil_tracker_service_logs', updated);
+
+    if (settings.supabase.connected && user) {
+      handleTriggerSync(undefined, undefined, updated);
+    }
+  };
+
+  const handleDeleteServiceLog = async (id: string) => {
+    const updated = serviceLogs.filter(log => log.id !== id);
+    setServiceLogs(updated);
+    await setDBItem('oil_tracker_service_logs', updated);
+
+    // Queue deletion id
+    const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
+    deletedIds.push(id);
+    await setDBItem('deleted_log_ids', deletedIds);
+
+    if (settings.supabase.connected && user) {
+      handleTriggerSync(undefined, undefined, updated);
     }
   };
 
@@ -404,7 +484,7 @@ export default function App() {
   }, [isOnline, user, settings.supabase.connected]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 transition-colors duration-300 flex flex-col md:flex-row overflow-hidden pb-16 md:pb-0">
+    <div className="h-[100dvh] bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 transition-colors duration-300 flex flex-col md:flex-row overflow-hidden">
 
       {/* 1. Desktop Sidebar (md and larger) */}
       <aside className="hidden md:flex w-64 border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex-col shrink-0 h-screen sticky top-0 justify-between select-none">
@@ -412,9 +492,6 @@ export default function App() {
           {/* Logo & Header */}
           <div className="p-6 border-b border-slate-150 dark:border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/25 flex items-center justify-center">
-                <Gauge className="w-5 h-5" />
-              </span>
               <div>
                 <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white leading-none font-display">
                   MOTO-LOG
@@ -480,7 +557,7 @@ export default function App() {
 
             {settings.supabase.connected && user && (
               <button
-                onClick={handleTriggerSync}
+                onClick={() => handleTriggerSync(undefined, undefined, undefined, true)}
                 disabled={syncStatus.isSyncing || !isOnline}
                 className="mt-2.5 w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
@@ -504,20 +581,17 @@ export default function App() {
       </aside>
 
       {/* 2. Main Area Panel */}
-      <div className="flex-1 flex flex-col h-screen overflow-y-auto min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
 
         {/* Mobile Header (md and smaller) */}
         <header className="sticky top-0 z-45 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800/80 transition-colors md:hidden shrink-0 pt-[env(safe-area-inset-top)]">
           <div className="px-4 h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 bg-indigo-600 rounded-xl text-white shadow-md">
-                <Gauge className="w-4 h-4" />
-              </span>
               <div>
                 <h1 className="text-sm font-black tracking-tight text-slate-900 dark:text-white font-display leading-none">
-                  Motor.ku Tracker
+                  Motor.ku
                 </h1>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">Jurnal BBM</span>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">Jurnal BBM & Oli</span>
               </div>
             </div>
 
@@ -574,8 +648,9 @@ export default function App() {
           <div className="flex flex-col">
             <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-display">
               {activeTab === 'dashboard' && 'Overview Performa'}
-              {activeTab === 'oil' && 'Riwayat Servis & Ganti Oli'}
-              {activeTab === 'fuel' && 'Pencatatan BBM & Efisiensi'}
+              {activeTab === 'oil' && 'Riwayat Oli'}
+              {activeTab === 'fuel' && 'Pencatatan BBM'}
+              {activeTab === 'service' && 'Riwayat Servis & Spare Part'}
               {activeTab === 'settings' && 'Pengaturan'}
             </h2>
             <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">
@@ -617,7 +692,7 @@ export default function App() {
             <div className="flex items-center border-l border-slate-200 dark:border-slate-800 pl-3 gap-1.5">
               <button
                 id="btn-export-pdf"
-                onClick={() => exportToPDF(oilLogs, fuelLogs)}
+                onClick={() => exportToPDF(oilLogs, fuelLogs, serviceLogs)}
                 title="Cetak Laporan PDF"
                 className="p-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-rose-600 transition-all cursor-pointer"
               >
@@ -625,7 +700,7 @@ export default function App() {
               </button>
               <button
                 id="btn-export-csv"
-                onClick={() => exportToCSV(oilLogs, fuelLogs, 'all')}
+                onClick={() => exportToCSV(oilLogs, fuelLogs, 'all', serviceLogs)}
                 title="Unduh Laporan CSV"
                 className="p-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-emerald-600 transition-all cursor-pointer"
               >
@@ -644,26 +719,18 @@ export default function App() {
           </div>
         </header>
 
-        {/* Sync Progress Indicator Banner */}
-        {syncProgressMsg && (
-          <div className="w-full bg-indigo-600 text-white text-center py-2 text-sm font-bold animate-pulse flex items-center justify-center gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            <span>{syncProgressMsg}</span>
-          </div>
-        )}
-
         {/* 3. Main Stage Container */}
-        <main className="flex-1 p-6 sm:p-8 pb-28 md:pb-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-6 sm:p-8 pb-16 md:pb-8 max-w-7xl w-full mx-auto space-y-6">
           {activeTab === 'dashboard' && (
             <Dashboard
               oilLogs={oilLogs}
               fuelLogs={fuelLogs}
+              serviceLogs={serviceLogs}
               settings={settings}
               onNavigate={(tab) => {
                 setActiveTab(tab);
-                // Open modal if they clicked add oil/fuel on dashboard to make it quick
                 setTimeout(() => {
-                  const btnId = tab === 'oil' ? 'btn-add-oil-log' : 'btn-add-fuel-log';
+                  const btnId = tab === 'oil' ? 'btn-add-oil-log' : tab === 'fuel' ? 'btn-add-fuel-log' : 'btn-add-service-log';
                   document.getElementById(btnId)?.click();
                 }, 100);
               }}
@@ -690,6 +757,16 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'service' && (
+            <ServiceLogs
+              logs={serviceLogs}
+              onAddLog={handleAddServiceLog}
+              onEditLog={handleEditServiceLog}
+              onDeleteLog={handleDeleteServiceLog}
+              settings={settings}
+            />
+          )}
+
           {activeTab === 'settings' && (
             <SettingsTab
               settings={settings}
@@ -698,7 +775,7 @@ export default function App() {
               oilLogs={oilLogs}
               fuelLogs={fuelLogs}
               onUpdateSettings={handleUpdateSettings}
-              onTriggerSync={handleTriggerSync}
+              onTriggerSync={() => handleTriggerSync(undefined, undefined, undefined, true)}
               onOpenAuth={() => setActiveTab('settings')}
               onLogout={handleLogout}
             />

@@ -26,6 +26,20 @@ export interface FuelLog {
   updated_at?: string;
 }
 
+export interface ServiceLog {
+  id: string;
+  user_id?: string;
+  date: string;
+  mileage: number; // in km
+  cost: number; // in IDR (Jasa + Sparepart)
+  service_type: string; // e.g. "Servis Rutin", "Ganti Sparepart", "Ganti Ban", "Ganti Gir Set"
+  description: string;
+  parts_changed?: string[]; // e.g. ["Ban Depan", "Ban Belakang", "Gir Set"]
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface TelegramConfig {
   botToken: string;
   chatId: string;

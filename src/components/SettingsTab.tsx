@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppSettings, SyncStatus, OilLog, FuelLog } from '../types';
 import { testSupabaseConnection, SUPABASE_SQL_SCRIPT, getSupabaseClient } from '../lib/supabaseClient';
+import { setDBItem } from '../lib/dbStorage';
 import { sendTelegramNotification } from '../utils/telegram';
+import { useToast } from './ToastContainer';
 import {
   Settings, Database, Send, Calendar, Milestone, Moon, Sun, Eye, EyeOff,
   Clipboard, Check, ShieldCheck, HelpCircle, LogIn, LogOut, RefreshCw, AlertTriangle,
-  Download
+  Download, Upload, Save
 } from 'lucide-react';
 
 interface SettingsTabProps {
@@ -20,6 +22,8 @@ interface SettingsTabProps {
   onLogout: () => void;
 }
 
+// ─── Component ───────────────────────────────────────────────────────────────
+// Tab Pengaturan untuk mengelola interval ganti oli, koneksi cloud Supabase, dan bot Telegram.
 export default function SettingsTab({
   settings,
   syncStatus,
@@ -31,18 +35,20 @@ export default function SettingsTab({
   onOpenAuth,
   onLogout
 }: SettingsTabProps) {
-  // Local form state for Supabase
+  const { showToast } = useToast();
+
+  // Local form state untuk sinkronisasi Database Supabase
   const [supabaseUrl, setSupabaseUrl] = useState(settings.supabase.url);
   const [supabaseKey, setSupabaseKey] = useState(settings.supabase.anonKey);
   const [showKey, setShowKey] = useState(false);
   const [dbConnecting, setDbConnecting] = useState(false);
   const [dbMessage, setDbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Auth local state
+  // Auth local state untuk autentikasi Supabase
   const [authEmail, setAuthEmail] = useState(settings.supabase.email || '');
   const [authPassword, setAuthPassword] = useState(settings.supabase.password || '');
 
-  // Local form state for Telegram
+  // Local form state untuk Notifikasi Telegram Bot
   const [tgToken, setTgToken] = useState(settings.telegram.botToken);
   const [tgChatId, setTgChatId] = useState(settings.telegram.chatId);
   const [tgEnabled, setTgEnabled] = useState(settings.telegram.enabled);
@@ -52,10 +58,52 @@ export default function SettingsTab({
   const [tgTesting, setTgTesting] = useState(false);
   const [tgMessage, setTgMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Local form state for Intervals
+  // Local form state untuk Interval (Jarak/Hari)
   const [intervalKm, setIntervalKm] = useState(settings.oilChangeIntervalKm);
   const [intervalDays, setIntervalDays] = useState(settings.oilChangeIntervalDays);
   const [fuelPrice, setFuelPrice] = useState(settings.fuelPricePerLiter || 10);
+
+  // App auto update state
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+
+  const handleCheckAppUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatus(null);
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          try {
+            await reg.update();
+          } catch (e) {
+            console.warn('[SW] Service worker update skipped:', e);
+          }
+        }
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => caches.delete(name)));
+        }
+        setUpdateStatus('Memuat ulang untuk mengambil versi terbaru...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+        return;
+      }
+      setUpdateStatus('Memuat ulang halaman...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch {
+      setUpdateStatus('Cache dibersihkan. Memuat ulang halaman...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   const [copiedSql, setCopiedSql] = useState(false);
 
@@ -68,7 +116,7 @@ export default function SettingsTab({
       oilChangeIntervalDays: Number(intervalDays),
       fuelPricePerLiter: Number(fuelPrice)
     });
-    alert('Pengaturan interval ganti oli dan harga BBM berhasil disimpan!');
+    showToast('Pengaturan interval ganti oli & harga BBM berhasil disimpan!', 'success', 'Pengaturan Tersimpan');
   };
 
   // Handle Test & Connect Supabase
@@ -96,15 +144,15 @@ export default function SettingsTab({
           connected: true
         }
       });
-      // Save to localStorage immediately so Supabase client loads it
-      localStorage.setItem('supabase_url', supabaseUrl.trim());
-      localStorage.setItem('supabase_anon_key', supabaseKey.trim());
-      localStorage.setItem('supabase_email', authEmail.trim());
-      localStorage.setItem('supabase_password', authPassword.trim());
+      // Save to IndexedDB storage immediately so Supabase client loads it
+      await setDBItem('supabase_url', supabaseUrl.trim());
+      await setDBItem('supabase_anon_key', supabaseKey.trim());
+      await setDBItem('supabase_email', authEmail.trim());
+      await setDBItem('supabase_password', authPassword.trim());
 
       // Attempt login if email and password are provided
       if (authEmail.trim() && authPassword.trim()) {
-        const client = getSupabaseClient();
+        const client = getSupabaseClient(supabaseUrl.trim(), supabaseKey.trim());
         if (client) {
           try {
             const { error: signInError } = await client.auth.signInWithPassword({
@@ -112,20 +160,132 @@ export default function SettingsTab({
               password: authPassword.trim(),
             });
             if (signInError) {
-              setDbMessage({ type: 'error', text: `Tersambung ke Supabase, tetapi gagal login: ${signInError.message}` });
+              if (signInError.message.toLowerCase().includes('invalid login credentials') || signInError.message.toLowerCase().includes('invalid credentials')) {
+                const { data: signUpData, error: signUpError } = await client.auth.signUp({
+                  email: authEmail.trim(),
+                  password: authPassword.trim(),
+                });
+                if (signUpError) {
+                  setDbMessage({ type: 'error', text: `Tersambung ke Supabase, tetapi gagal masuk/daftar: ${signUpError.message}` });
+                } else if (signUpData.user) {
+                  setDbMessage({ type: 'success', text: 'Berhasil mendaftar akun baru dan terhubung ke Supabase!' });
+                  setTimeout(() => onTriggerSync(), 500);
+                }
+              } else {
+                setDbMessage({ type: 'error', text: `Tersambung ke Supabase, tetapi gagal login: ${signInError.message}` });
+              }
             } else {
               setDbMessage({ type: 'success', text: 'Berhasil terhubung ke Supabase dan masuk akun!' });
+              setTimeout(() => onTriggerSync(), 500);
             }
           } catch (err: any) {
             console.error(err);
             setDbMessage({ type: 'error', text: `Gagal login: ${err.message}` });
           }
         }
+      } else {
+        setTimeout(() => onTriggerSync(), 500);
       }
     } else {
       setDbMessage({ type: 'error', text: result.message });
     }
     setDbConnecting(false);
+  };
+
+  // Ref for Supabase Config JSON file import input
+  const supabaseFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Export Supabase JSON settings to Download folder
+  const handleExportSupabaseConfig = () => {
+    try {
+      const configData = {
+        app: 'Motor.ku Tracker',
+        type: 'supabase_config',
+        exportedAt: new Date().toISOString(),
+        supabase: {
+          url: supabaseUrl.trim(),
+          anonKey: supabaseKey.trim(),
+          email: authEmail.trim(),
+          password: authPassword.trim()
+        }
+      };
+
+      const jsonString = JSON.stringify(configData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      downloadAnchor.download = `supabase_config_${dateStr}.json`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+
+      document.body.removeChild(downloadAnchor);
+      URL.revokeObjectURL(url);
+      showToast('Konfigurasi Supabase berhasil diekspor ke folder Download!', 'success', 'Ekspor Supabase');
+    } catch (error) {
+      console.error('Gagal mengekspor konfigurasi Supabase:', error);
+      showToast('Gagal membuat file JSON Supabase.', 'error', 'Error Ekspor');
+    }
+  };
+
+  // Import Supabase JSON settings from local file
+  const handleImportSupabaseConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        const config = parsed.supabase || parsed.settings?.supabase || parsed;
+
+        const importedUrl = config.url || config.supabaseUrl || '';
+        const importedKey = config.anonKey || config.supabaseKey || config.key || '';
+        const importedEmail = config.email || config.authEmail || '';
+        const importedPassword = config.password || config.authPassword || '';
+
+        if (!importedUrl && !importedKey) {
+          showToast('File JSON tidak berisi konfigurasi Supabase yang valid.', 'error', 'Format Tidak Valid');
+          return;
+        }
+
+        setSupabaseUrl(importedUrl);
+        setSupabaseKey(importedKey);
+        setAuthEmail(importedEmail);
+        setAuthPassword(importedPassword);
+
+        // Update settings in state & storage
+        onUpdateSettings({
+          ...settings,
+          supabase: {
+            url: importedUrl,
+            anonKey: importedKey,
+            email: importedEmail,
+            password: importedPassword,
+            connected: settings.supabase.connected
+          }
+        });
+
+        await setDBItem('supabase_url', importedUrl);
+        await setDBItem('supabase_anon_key', importedKey);
+        await setDBItem('supabase_email', importedEmail);
+        await setDBItem('supabase_password', importedPassword);
+
+        showToast('Konfigurasi Supabase berhasil diimpor dari file JSON!', 'success', 'Impor Supabase');
+      } catch (err) {
+        console.error('Gagal membaca file JSON Supabase:', err);
+        showToast('File JSON rusak atau format tidak sesuai.', 'error', 'Gagal Impor');
+      } finally {
+        if (event.target) {
+          event.target.value = '';
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Handle Save Telegram Configurations
@@ -142,7 +302,7 @@ export default function SettingsTab({
         notifyOnKmBefore: Number(tgKm)
       }
     });
-    alert('Pengaturan notifikasi Telegram berhasil disimpan!');
+    showToast('Pengaturan notifikasi Telegram berhasil disimpan!', 'success', 'Telegram Config');
   };
 
   // Handle Test Telegram Alert
@@ -200,9 +360,10 @@ export default function SettingsTab({
       // Cleanup
       document.body.removeChild(downloadAnchor);
       URL.revokeObjectURL(url);
+      showToast('File cadangan data berhasil diunduh!', 'success', 'Backup JSON');
     } catch (error) {
       console.error('Gagal mengunduh cadangan:', error);
-      alert('Gagal membuat file cadangan.');
+      showToast('Gagal membuat file cadangan.', 'error', 'Error Backup');
     }
   };
 
@@ -212,14 +373,46 @@ export default function SettingsTab({
 
       {/* 2. Oil Intervals Configurations (user limit setting) */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
-        <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-          <Calendar className="w-5 h-5 text-indigo-500" /> Interval Penjadwalan Ganti Oli
-        </h3>
+        <div className="flex items-center justify-between mb-4 border-b border-slate-50 dark:border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-indigo-500" /> Ganti Oli
+          </h3>
+          <div className="flex items-center gap-1">
+            <button
+              id="btn-download-backup"
+              type="button"
+              onClick={handleDownloadBackup}
+              className="p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              title="Download Backup JSON"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            <button
+              id="btn-sync-now"
+              type="button"
+              onClick={onTriggerSync}
+              disabled={syncStatus.isSyncing || !settings.supabase.connected || !user}
+              className={`p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${syncStatus.isSyncing ? 'animate-spin text-indigo-500' : ''}`}
+              title="Sinkronisasi Cloud"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            <button
+              id="btn-save-intervals"
+              type="button"
+              onClick={handleSaveIntervals}
+              className="p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer"
+              title="Simpan Pengaturan"
+            >
+              <Save className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
 
-        <form onSubmit={handleSaveIntervals} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <form className="grid grid-cols-3 gap-2 sm:gap-6">
           <div>
-            <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Interval Berdasarkan Jarak (Kilometer)
+            <label className="block text-[10px] sm:text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5 truncate">
+              Jarak (Km)
             </label>
             <div className="relative">
               <input
@@ -228,19 +421,18 @@ export default function SettingsTab({
                 required
                 value={intervalKm}
                 onChange={(e) => setIntervalKm(Number(e.target.value))}
-                placeholder="Contoh: 2000"
-                className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold"
+                placeholder="2000"
+                className="w-full py-2 sm:py-2.5 pl-2 sm:pl-3 pr-7 sm:pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-xs sm:text-sm font-semibold"
               />
-              <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-sm font-bold text-slate-400 pointer-events-none">
+              <span className="absolute inset-y-0 right-0 flex items-center pr-2 sm:pr-4 text-[10px] sm:text-sm font-bold text-slate-400 pointer-events-none">
                 KM
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5">Rekomendasi umum ganti oli motor adalah setiap <b>2.000 km - 3.000 km</b>.</p>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Interval Berdasarkan Waktu (Hari)
+            <label className="block text-[10px] sm:text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5 truncate">
+              Waktu (Hari)
             </label>
             <div className="relative">
               <input
@@ -249,19 +441,18 @@ export default function SettingsTab({
                 required
                 value={intervalDays}
                 onChange={(e) => setIntervalDays(Number(e.target.value))}
-                placeholder="Contoh: 90"
-                className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold"
+                placeholder="90"
+                className="w-full py-2 sm:py-2.5 pl-2 sm:pl-3 pr-8 sm:pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-xs sm:text-sm font-semibold"
               />
-              <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-sm font-bold text-slate-400 pointer-events-none">
+              <span className="absolute inset-y-0 right-0 flex items-center pr-2 sm:pr-4 text-[10px] sm:text-sm font-bold text-slate-400 pointer-events-none">
                 Hari
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5">Disarankan ganti oli maksimal setiap <b>90 hari</b> (3 bulan) meski jarak belum tercapai.</p>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5">
-              Harga BBM per Liter (Pertalite)
+            <label className="block text-[10px] sm:text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1.5 truncate">
+              Harga BBM/L
             </label>
             <div className="relative">
               <input
@@ -270,98 +461,45 @@ export default function SettingsTab({
                 required
                 value={fuelPrice}
                 onChange={(e) => setFuelPrice(Number(e.target.value))}
-                placeholder="Contoh: 10000"
-                className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold"
+                placeholder="10000"
+                className="w-full py-2 sm:py-2.5 pl-2 sm:pl-3 pr-7 sm:pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-xs sm:text-sm font-semibold"
               />
-              <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-[12px] font-bold text-slate-400 pointer-events-none">
-                Rp/L
+              <span className="absolute inset-y-0 right-0 flex items-center pr-2 sm:pr-4 text-[10px] sm:text-[12px] font-bold text-slate-400 pointer-events-none">
+                Rp
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 mt-1.5">Digunakan untuk <b>konversi otomatis rupiah ke liter</b> saat catat BBM (Default Pertalite: Rp 10.000/L).</p>
-          </div>
-
-          <div className="md:col-span-3 flex justify-end">
-            <button
-              id="btn-save-intervals"
-              type="submit"
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer"
-            >
-              Simpan Pengaturan
-            </button>
           </div>
         </form>
-      </div>
-
-      {/* 2.5 Backup & Data Export Card */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
-        <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-          <Download className="w-5 h-5 text-indigo-500" /> Cadangan & Ekspor Data
-        </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-          Amankan data Anda secara mandiri. Unduh seluruh riwayat ganti oli dan catatan konsumsi bahan bakar (BBM) Anda dalam format file JSON. File cadangan ini dapat Anda simpan secara lokal sebagai tindakan pencegahan kehilangan data jika terjadi kegagalan sistem atau penghapusan cache browser.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/60">
-          <div className="space-y-1">
-            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">File Cadangan Motor.ku</h4>
-            <p className="text-[12px] text-slate-400">
-              Total catatan: <span className="font-bold text-slate-700 dark:text-slate-300">{oilLogs.length} Ganti Oli</span> dan <span className="font-bold text-slate-700 dark:text-slate-300">{fuelLogs.length} BBM</span>
-            </p>
-          </div>
-          <button
-            id="btn-download-backup"
-            type="button"
-            onClick={handleDownloadBackup}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs self-stretch sm:self-auto justify-center"
-          >
-            <Download className="w-4 h-4" /> Download Cadangan (JSON)
-          </button>
-        </div>
       </div>
 
       {/* 3. Supabase Cloud Sync Configuration */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs space-y-6">
         <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
           <span className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-500" /> Sinkronisasi Database Supabase (Real-Time)
+            <Database className="w-5 h-5 text-indigo-500" /> Supabase
           </span>
-          <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${settings.supabase.connected
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
-            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
-            }`}>
-            {settings.supabase.connected ? 'Supabase' : 'Offline'}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${settings.supabase.connected
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
+              }`}>
+              {settings.supabase.connected ? 'o' : 'Offline'}
+            </span>
+            <button
+              id="btn-test-supabase"
+              type="button"
+              onClick={handleConnectSupabase}
+              disabled={dbConnecting}
+              className={`p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer disabled:opacity-50`}
+              title="Simpan & Hubungkan Database"
+            >
+              {dbConnecting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            </button>
+          </div>
         </h3>
 
-        <div>
-          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Data Offline Pending</h4>
-          <div className="mt-2 space-y-2">
-            <p className="text-sm text-slate-500">
-              Data lokal belum tersinkron: <b className="text-indigo-600 dark:text-indigo-400">{syncStatus.pendingSyncCount} baris</b>
-            </p>
-            {syncStatus.lastSyncedAt && (
-              <p className="text-[12px] text-slate-400">
-                Sinkronisasi terakhir: {new Date(syncStatus.lastSyncedAt).toLocaleTimeString('id-ID')}
-              </p>
-            )}
-            <button
-              id="btn-sync-now"
-              onClick={onTriggerSync}
-              disabled={syncStatus.isSyncing || !settings.supabase.connected || !user}
-              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-bold rounded-lg text-sm flex items-center gap-1 disabled:opacity-50 cursor-pointer transition-all"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${syncStatus.isSyncing ? 'animate-spin text-indigo-500' : ''}`} />
-              {syncStatus.isSyncing ? 'Menyinkronkan...' : 'Sinkronisasikan Sekarang'}
-            </button>
-            {!user && settings.supabase.connected && (
-              <p className="text-[11px] text-amber-500">Silakan masuk akun terlebih dahulu untuk melakukan sinkronisasi.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Credentials Inputs */}
-      <div className="space-y-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+      <div className="space-y-4 pt-1">
         <div>
           <label className="block text-[13px] font-bold tracking-widest text-slate-400 mb-2">
             Supabase Project URL
@@ -438,26 +576,45 @@ export default function SettingsTab({
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
-          <button
-            id="btn-test-supabase"
-            type="button"
-            onClick={handleConnectSupabase}
-            disabled={dbConnecting}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            {dbConnecting ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menghubungkan...
-              </>
-            ) : (
-              <>
-                <Database className="w-3.5 h-3.5" /> Simpan & Hubungkan Database
-              </>
-            )}
-          </button>
+        {/* Action Panel for Backup & Import Supabase Config JSON */}
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-950/50 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
+          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+            <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">Seting Supabase (JSON)</span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            {/* Hidden File Input for Import */}
+            <input
+              type="file"
+              ref={supabaseFileInputRef}
+              accept=".json"
+              onChange={handleImportSupabaseConfig}
+              className="hidden"
+            />
+
+            <button
+              id="btn-import-supabase-json"
+              type="button"
+              onClick={() => supabaseFileInputRef.current?.click()}
+              className="flex-1 sm:flex-none px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              title="Pilih & impor file JSON seting Supabase dari folder Download"
+            >
+              <Upload className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Impor
+            </button>
+
+            <button
+              id="btn-export-supabase-json"
+              type="button"
+              onClick={handleExportSupabaseConfig}
+              className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900/90 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              title="Unduh file JSON seting Supabase ke folder Download"
+            >
+              <Download className="w-3.5 h-3.5" /> Ekspor
+            </button>
+          </div>
         </div>
       </div>
+    </div>
 
       {/* 4. Telegram Alert Configurations */ }
   <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
@@ -609,6 +766,69 @@ export default function SettingsTab({
       </div>
     </form>
   </div>
-    </div >
+
+  {/* Auto Update APK & PWA Section */}
+  <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 md:p-6 shadow-xs">
+    <div className="flex items-center gap-3 mb-4">
+      <div className="p-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+        <RefreshCw className="w-5 h-5" />
+      </div>
+      <div>
+        <h3 className="text-base font-bold text-slate-900 dark:text-white">Pembaruan Otomatis (APK & PWA)</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Pembaruan otomatis tanpa perlu uninstall aplikasi lama</p>
+      </div>
+    </div>
+
+    <div className="space-y-4">
+      <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
+        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+        <div>
+          <span className="font-semibold block mb-0.5">Pembaruan Latar Belakang Aktif:</span>
+          Aplikasi terpasang (PWA / Web-APK) secara otomatis mengambil file dan fitur terbaru dari server tanpa menghapus data lokal atau perlu uninstall APK lama.
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800">
+        <div>
+          <span className="text-xs text-slate-400 block font-medium">Status Aplikasi:</span>
+          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Siap Auto Update (Network-First SW)
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCheckAppUpdate}
+          disabled={checkingUpdate}
+          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
+          {checkingUpdate ? 'Memeriksa & Memperbarui...' : 'Perbarui Aplikasi Sekarang'}
+        </button>
+      </div>
+
+      {updateStatus && (
+        <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs flex items-center gap-2">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+          <span>{updateStatus}</span>
+        </div>
+      )}
+
+      {/* Guide for building/installing Android APK updates */}
+      <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-150 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+        <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+          <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0" />
+          Petunjuk Update File APK Android (Satu Langkah Menimpa APK Lama):
+        </p>
+        <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+          <li>Gunakan <b>Package Name</b> (App ID) yang sama persis (misal: <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">com.motorku.app</code>).</li>
+          <li>Gunakan <b>Sertifikat / Keystore</b> tanda tangan yang sama saat men-generate file <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">.apk</code> baru.</li>
+          <li>Naikkan nilai <b>Version Code</b> pada pembuat APK (misal dari <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">1</code> ke <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400 font-mono">2</code>).</li>
+          <li>Saat diklik install di HP Android, OS akan otomatis mendeteksi sebagai <b>Pembaruan Aplikasi</b> dan menimpa APK lama tanpa perlu uninstall atau menghapus data.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
   );
 }
