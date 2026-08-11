@@ -139,7 +139,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const totalOilCost = oilLogs.reduce((sum, l) => sum + l.cost, 0);
   const totalServiceCost = serviceLogs.reduce((sum, l) => sum + l.cost, 0);
   const totalExpenses = totalFuelCost + totalOilCost + totalServiceCost;
-  
+
   const today = new Date();
 
   // Current Month Data
@@ -470,10 +470,10 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
           {/* Mini stats row */}
           <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: Milestone, label: 'Total Jarak Bulan Ini', value: `${thisMonthKm.toLocaleString('id-ID')} km` },
-              { icon: Target, label: 'Konsumsi BBM', value: avgEfficiency > 0 ? `${avgEfficiency.toFixed(1)} km/L` : '-' },
-              { icon: Flame, label: 'Total BBM Bulan ini', value: formatIDR(currentMonthFuelCost) },
-              { icon: Timer, label: 'Total BBM Bulan lalu', value: formatIDR(lastMonthFuelCost) },
+              { icon: Milestone, label: 'Jarak Bulan Ini', value: `${thisMonthKm.toLocaleString('id-ID')} km` },
+              { icon: Target, label: 'Efisiensi BBM', value: avgEfficiency > 0 ? `${avgEfficiency.toFixed(1)} km/L` : '-' },
+              { icon: Flame, label: 'BBM Bulan ini', value: formatIDR(currentMonthFuelCost) },
+              { icon: Timer, label: 'BBM Bulan lalu', value: formatIDR(lastMonthFuelCost) },
             ].map((item, i) => (
               <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                 <div className="flex items-center gap-2 text-indigo-200/70 text-[11px] font-medium tracking-wider mb-1">
@@ -584,7 +584,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             <option className="dark:bg-slate-800" value="3m">3 Bulan</option>
             <option className="dark:bg-slate-800" value="year">Tahun {currentYear}</option>
             <option className="dark:bg-slate-800" value="all">Semua</option>
-            <option className="dark:bg-slate-800" value="custom">Kustom Tanggal</option>
+            <option className="dark:bg-slate-800" value="custom">Tanggal</option>
           </select>
         </div>
 
@@ -726,7 +726,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
               </span>
             </div>
             <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-400 tracking-wider mb-1">
-              Rata-rata Konsumsi
+              Efisiensi
             </span>
             <div className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tabular-nums">
               {filteredAvgEfficiency > 0 ? `${filteredAvgEfficiency.toFixed(1)} km/L` : '—'}
@@ -741,7 +741,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
       </motion.div>
 
       {/* ═══════════════════════ 3. CORE METRICS ═══════════════════════ */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+      <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
         {[
           {
             icon: Milestone,
@@ -755,14 +755,6 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             sub: totalKm > 0
               ? `${sortedJarakMonths.length} bulan tercatat · Total ${totalKm.toFixed(1)} km`
               : !jarakLoading ? 'Belum ada data jarak tempuh' : 'Memuat...',
-          },
-          {
-            icon: TrendingUp, label: 'Rata-rata Konsumsi', value: avgEfficiency, suffix: ' km/L',
-            color: 'from-emerald-500 to-teal-600', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30',
-            iconColor: 'text-emerald-600 dark:text-emerald-400',
-            decimals: 1,
-            sub: totalLiters > 0 ? `${totalLiters.toFixed(1)}L total terpakai` : null,
-            gpsBadge: avgEfficiency > 0,
           },
           {
             icon: Coins, label: 'Total Pengeluaran', value: totalExpenses,
@@ -838,7 +830,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                 <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
                   <Battery className="w-4 h-4" />
                 </div>
-                Kesehatan Oli
+                Kondisi Oli
               </h3>
               <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full border ${healthColor.border} ${healthColor.light} ${healthColor.text}`}>
                 {oilLifePercent}%
@@ -1018,31 +1010,28 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
             <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold self-start sm:self-auto">
               <button
                 onClick={() => setFuelMetricMode('km_l')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  fuelMetricMode === 'km_l'
-                    ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${fuelMetricMode === 'km_l'
+                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
               >
                 km/L
               </button>
               <button
                 onClick={() => setFuelMetricMode('l_100km')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  fuelMetricMode === 'l_100km'
-                    ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${fuelMetricMode === 'l_100km'
+                  ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
               >
                 L/100km
               </button>
               <button
                 onClick={() => setFuelMetricMode('cost_km')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  fuelMetricMode === 'cost_km'
-                    ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${fuelMetricMode === 'cost_km'
+                  ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
               >
                 Rp/km
               </button>
@@ -1197,15 +1186,14 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                 </h3>
               </div>
               {avgEfficiency > 0 && (
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                  avgEfficiency >= 45
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40'
-                    : avgEfficiency >= 35
-                      ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40'
-                      : avgEfficiency >= 25
-                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40'
-                        : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40'
-                }`}>
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${avgEfficiency >= 45
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40'
+                  : avgEfficiency >= 35
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40'
+                    : avgEfficiency >= 25
+                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40'
+                      : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40'
+                  }`}>
                   {avgEfficiency >= 45 ? '🌿 Sangat Hemat' : avgEfficiency >= 35 ? '🔵 Standard Irit' : avgEfficiency >= 25 ? '🟡 Cukup Boros' : '🔴 Perlu Tune-up'}
                 </span>
               )}

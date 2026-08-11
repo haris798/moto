@@ -96,10 +96,10 @@ export default function App() {
         const maxOilMileage = Math.max(...cachedOil.map(l => l.mileage));
         const maxFuelMileage = cachedFuel.length > 0 ? Math.max(...cachedFuel.map(l => l.mileage)) : 0;
         const currentMileage = Math.max(maxOilMileage, maxFuelMileage);
-        
+
         const elapsedKm = currentMileage - lastOil.mileage;
         const remainingKm = Math.max(0, loadedSettings.oilChangeIntervalKm - elapsedKm);
-        
+
         const lastDate = new Date(lastOil.date);
         const today = new Date();
         const elapsedMs = today.getTime() - lastDate.getTime();
@@ -523,7 +523,7 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div>
                 <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white leading-none font-display">
-                  MOTO-LOG
+                  Motor.ku
                 </h1>
                 <span className="text-[12px] text-slate-400 dark:text-slate-500 font-medium tracking-wide">Oil & Fuel Tracker</span>
               </div>
@@ -547,8 +547,8 @@ export default function App() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full text-left px-3.5 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-3 cursor-pointer ${isActive
-                      ? 'bg-indigo-50/70 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100/40 dark:border-indigo-900/20'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40 border border-transparent'
+                    ? 'bg-indigo-50/70 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100/40 dark:border-indigo-900/20'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40 border border-transparent'
                     }`}
                 >
                   <div className={`w-1 h-4 rounded-full ${isActive ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-transparent'}`} />
@@ -567,10 +567,10 @@ export default function App() {
               <span className="text-[12px] font-bold text-slate-450 dark:text-slate-500 capitalize tracking-wider">Cloud Sync</span>
               <div
                 className={`w-2.5 h-2.5 rounded-full animate-pulse ${!isOnline
-                    ? 'bg-rose-500'
-                    : syncStatus.pendingSyncCount > 0
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-500'
+                  ? 'bg-rose-500'
+                  : syncStatus.pendingSyncCount > 0
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
                   }`}
                 title={!isOnline ? 'Offline' : syncStatus.pendingSyncCount > 0 ? 'Tertunda sinkronisasi' : 'Sinkron'}
               />
@@ -598,10 +598,10 @@ export default function App() {
             <div className="mt-2.5 w-full bg-slate-200 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-550 ${!isOnline
-                    ? 'bg-rose-500 w-1/3'
-                    : syncStatus.pendingSyncCount > 0
-                      ? 'bg-amber-500 w-2/3'
-                      : 'bg-emerald-500 w-full'
+                  ? 'bg-rose-500 w-1/3'
+                  : syncStatus.pendingSyncCount > 0
+                    ? 'bg-amber-500 w-2/3'
+                    : 'bg-emerald-500 w-full'
                   }`}
               />
             </div>
@@ -648,18 +648,18 @@ export default function App() {
                 className="flex-1 flex flex-col items-center justify-center h-full relative cursor-pointer group transition-all"
               >
                 <div className={`absolute inset-y-1.5 inset-x-2 rounded-2xl transition-all duration-300 -z-10 ${isActive
-                    ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
-                    : 'bg-transparent group-hover:bg-slate-50 dark:group-hover:bg-slate-800/10'
+                  ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
+                  : 'bg-transparent group-hover:bg-slate-50 dark:group-hover:bg-slate-800/10'
                   }`} />
 
                 <IconComponent className={`w-5 h-5 transition-all duration-300 ${isActive
-                    ? 'text-indigo-600 dark:text-indigo-400 scale-110'
-                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'
+                  ? 'text-indigo-600 dark:text-indigo-400 scale-110'
+                  : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'
                   }`} />
 
                 <span className={`text-[11px] mt-1 font-bold tracking-wide transition-all duration-300 ${isActive
-                    ? 'text-indigo-600 dark:text-indigo-400 font-extrabold'
-                    : 'text-slate-400 dark:text-slate-500'
+                  ? 'text-indigo-600 dark:text-indigo-400 font-extrabold'
+                  : 'text-slate-400 dark:text-slate-500'
                   }`}>
                   {tab.label}
                 </span>
@@ -691,12 +691,12 @@ export default function App() {
             {/* Online Badge */}
             <span
               className={`inline-flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-xl ${isOnline
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100/60 dark:border-emerald-900/30'
-                  : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-100/60 dark:border-rose-900/30'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100/60 dark:border-emerald-900/30'
+                : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-100/60 dark:border-rose-900/30'
                 }`}
             >
               {isOnline ? <Cloud className="w-3.5 h-3.5" /> : <CloudOff className="w-3.5 h-3.5" />}
-              <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+              <span>{isOnline ? 'Online' : 'Offline'}</span>
             </span>
 
             {/* Cloud trigger */}
