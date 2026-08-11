@@ -365,9 +365,9 @@ export default function ServiceLogs({
             onChange={(e) => setTypeFilter(e.target.value)}
             className="flex-1 bg-transparent text-slate-800 dark:text-white text-sm focus:outline-hidden"
           >
-            <option value="All">Semua Kategori Servis</option>
+            <option className="dark:bg-slate-800" value="All">Semua Kategori Servis</option>
             {PRESET_SERVICE_TYPES.map(t => (
-              <option key={t} value={t}>{t}</option>
+              <option className="dark:bg-slate-800" key={t} value={t}>{t}</option>
             ))}
           </select>
         </div>
@@ -577,7 +577,7 @@ export default function ServiceLogs({
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden font-medium"
                   >
                     {PRESET_SERVICE_TYPES.map(t => (
-                      <option key={t} value={t}>{t}</option>
+                      <option className="dark:bg-slate-800" key={t} value={t}>{t}</option>
                     ))}
                   </select>
                 </div>

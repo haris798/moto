@@ -12,7 +12,7 @@ import {
   RefreshCw, Timer, Zap, Flame,
   Battery, Wrench, Clock, Target, Milestone, Satellite, Calendar,
   Filter, CalendarDays, SlidersHorizontal, ChevronDown, RotateCcw, Compass, Sparkles,
-  ArrowDownRight, ArrowUpRight
+  ArrowDownRight, ArrowUpRight, ListFilter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -455,7 +455,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => onNavigate('oil')}
-                className="px-3.5 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg"
+                className={`px-3.5 py-2.5 ${lastOilLog ? healthColor.bg + ' text-white hover:opacity-90' : 'bg-white/20 hover:bg-white/30 text-white'} backdrop-blur-sm font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shadow-lg`}
               >
                 <Droplets className="w-4 h-4" /> Oli
               </motion.button>
@@ -553,109 +553,6 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
         </motion.div>
       </motion.div>
 
-      {/* ═══════════════════════ 2. ALERT BANNER ═══════════════════════ */}
-      <AnimatePresence mode="wait">
-        {lastOilLog && (remainingKm <= settings.telegram.notifyOnKmBefore || remainingDays <= settings.telegram.notifyOnDaysBefore) ? (
-          <motion.div
-            key="alert-danger"
-            variants={fadeUp}
-            initial="hidden"
-            animate="show"
-            exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
-            className="relative overflow-hidden rounded-xl border border-red-200/60 dark:border-red-900/40 bg-gradient-to-r from-red-50 to-red-50/50 dark:from-red-950/30 dark:to-red-950/10"
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(239,68,68,0.06),transparent_60%)] pointer-events-none" />
-            <div className="relative flex items-start gap-3.5 p-4 md:p-5">
-              <div className="p-2.5 rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-red-800 dark:text-red-300 text-sm md:text-base">
-                  ⚠️ Jadwal Ganti Oli Sudah Dekat!
-                </p>
-                <p className="text-sm text-red-700/80 dark:text-red-400/70 mt-1 leading-relaxed">
-                  {remainingKm <= 0 && remainingDays <= 0
-                    ? 'Batas kilometer dan hari sudah terlampaui! Segera ganti oli.'
-                    : remainingKm <= 0
-                      ? `Batas kilometer sudah terlampaui! Segera ganti oli motor Anda.`
-                      : remainingDays <= 0
-                        ? `Batas hari sudah terlampaui! Segera ganti oli motor Anda.`
-                        : `Tersisa ${remainingKm.toLocaleString('id-ID')} km atau ${remainingDays} hari lagi.`
-                      }
-                </p>
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onNavigate('oil')}
-                className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-lg shadow-red-600/20"
-              >
-                Ganti Oli Sekarang
-              </motion.button>
-            </div>
-          </motion.div>
-        ) : lastOilLog ? (
-          <motion.div
-            key="alert-safe"
-            variants={fadeUp}
-            initial="hidden"
-            animate="show"
-            exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
-            className="relative overflow-hidden rounded-xl border border-emerald-200/60 dark:border-emerald-900/30 bg-gradient-to-r from-emerald-50 to-emerald-50/30 dark:from-emerald-950/20 dark:to-emerald-950/5"
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(16,185,129,0.05),transparent_60%)] pointer-events-none" />
-            <div className="relative flex items-center gap-3.5 p-4 md:p-5">
-              <div className="p-2.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 shrink-0">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-emerald-800 dark:text-emerald-300 text-sm md:text-base">
-                  ✅ Oli dalam Kondisi Baik
-                </p>
-                <p className="text-sm text-emerald-700/70 dark:text-emerald-400/60 mt-0.5">
-                  Oli masih aman — tersisa {remainingKm.toLocaleString('id-ID')} km atau {remainingDays} hari lagi
-                </p>
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => onNavigate('oil')}
-                className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg transition-all cursor-pointer shrink-0 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-              >
-                Lihat Detail
-              </motion.button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="alert-empty"
-            variants={fadeUp}
-            initial="hidden"
-            animate="show"
-            exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
-            className="rounded-xl border border-amber-200/60 dark:border-amber-900/30 bg-gradient-to-r from-amber-50 to-amber-50/30 dark:from-amber-950/20 dark:to-amber-950/5 p-4 md:p-5 flex items-center gap-3.5"
-          >
-            <div className="p-2.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-amber-800 dark:text-amber-300">Belum Ada Data Ganti Oli</p>
-              <p className="text-sm text-amber-700/70 dark:text-amber-400/60 mt-0.5">
-                Catat ganti oli pertama untuk mulai melacak masa pakai oli
-              </p>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => onNavigate('oil')}
-              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shrink-0 shadow-lg shadow-amber-600/20"
-            >
-              Catat Sekarang
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ═══════════════════════ 2.5 FILTER RENTANG TANGGAL & RINGKASAN PERIODE ═══════════════════════ */}
       <motion.div variants={fadeUp} className="space-y-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 p-4 md:p-6 shadow-sm">
         {/* Header & Title */}
@@ -677,31 +574,21 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
         </div>
 
         {/* Quick Filter Preset Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          {[
-            { mode: '7d', label: 'Mingguan (7 Hari)' },
-            { mode: 'month', label: 'Bulan Ini' },
-            { mode: '30d', label: '30 Hari' },
-            { mode: '3m', label: '3 Bulan' },
-            { mode: 'year', label: `Tahun ${currentYear}` },
-            { mode: 'all', label: 'Semua' },
-            { mode: 'custom', label: 'Kustom Tanggal' },
-          ].map((item) => {
-            const isActive = timeFilterMode === item.mode;
-            return (
-              <button
-                key={item.mode}
-                onClick={() => setTimeFilterMode(item.mode as TimeFilterMode)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
-                  isActive
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20'
-                    : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/60 px-3 py-2 shadow-xs">
+          <ListFilter className="w-4 h-4 text-indigo-500 shrink-0" />
+          <select
+            value={timeFilterMode}
+            onChange={(e) => setTimeFilterMode(e.target.value as TimeFilterMode)}
+            className="flex-1 bg-transparent text-slate-800 dark:text-white text-sm focus:outline-hidden"
+          >
+            <option className="dark:bg-slate-800" value="30d">30 Hari</option>
+            <option className="dark:bg-slate-800" value="7d">Mingguan (7 Hari)</option>
+            <option className="dark:bg-slate-800" value="month">Bulan Ini</option>
+            <option className="dark:bg-slate-800" value="3m">3 Bulan</option>
+            <option className="dark:bg-slate-800" value="year">Tahun {currentYear}</option>
+            <option className="dark:bg-slate-800" value="all">Semua</option>
+            <option className="dark:bg-slate-800" value="custom">Kustom Tanggal</option>
+          </select>
         </div>
 
         {/* Custom Date Range Picker */}
