@@ -13,7 +13,7 @@ import ServiceLogs from './components/ServiceLogs';
 import SettingsTab from './components/SettingsTab';
 import {
   Gauge, Droplets, Fuel, Wrench, Settings, Cloud, CloudOff, FileSpreadsheet, FileText, RefreshCw,
-  Sun, Moon, LogOut
+  Sun, Moon
 } from 'lucide-react';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -88,6 +88,34 @@ export default function App() {
 
       const cachedService = await getDBItem<ServiceLog[]>('oil_tracker_service_logs', []);
       setServiceLogs(cachedService);
+
+      // Check oil status for toast notification
+      if (cachedOil.length > 0) {
+        const lastOil = cachedOil[0];
+        const maxOilMileage = Math.max(...cachedOil.map(l => l.mileage));
+        const maxFuelMileage = cachedFuel.length > 0 ? Math.max(...cachedFuel.map(l => l.mileage)) : 0;
+        const currentMileage = Math.max(maxOilMileage, maxFuelMileage);
+        
+        const elapsedKm = currentMileage - lastOil.mileage;
+        const remainingKm = Math.max(0, loadedSettings.oilChangeIntervalKm - elapsedKm);
+        
+        const lastDate = new Date(lastOil.date);
+        const today = new Date();
+        const elapsedMs = today.getTime() - lastDate.getTime();
+        const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+        const remainingDays = Math.max(0, loadedSettings.oilChangeIntervalDays - elapsedDays);
+
+        if (remainingKm <= loadedSettings.telegram.notifyOnKmBefore || remainingDays <= loadedSettings.telegram.notifyOnDaysBefore) {
+          setTimeout(() => {
+            const isOverdue = remainingKm <= 0 || remainingDays <= 0;
+            if (isOverdue) {
+              showToast('Batas ganti oli sudah terlampaui! Segera ganti oli motor Anda.', 'error', 'Peringatan Oli');
+            } else {
+              showToast(`Jadwal ganti oli sudah dekat! Tersisa ${remainingKm.toLocaleString('id-ID')} km / ${remainingDays} hari.`, 'warning', 'Peringatan Oli');
+            }
+          }, 500);
+        }
+      }
 
       // C. Konfigurasi Tema (Terang/Gelap)
       const themeVal = await getDBItem<string>('oil_tracker_theme', 'light');
@@ -726,7 +754,6 @@ export default function App() {
               oilLogs={oilLogs}
               fuelLogs={fuelLogs}
               serviceLogs={serviceLogs}
-              settings={settings}
               onNavigate={(tab) => {
                 setActiveTab(tab);
                 setTimeout(() => {
@@ -743,7 +770,6 @@ export default function App() {
               onAddLog={handleAddOilLog}
               onEditLog={handleEditOilLog}
               onDeleteLog={handleDeleteOilLog}
-              settings={settings}
             />
           )}
 
@@ -753,7 +779,6 @@ export default function App() {
               onAddLog={handleAddFuelLog}
               onEditLog={handleEditFuelLog}
               onDeleteLog={handleDeleteFuelLog}
-              settings={settings}
             />
           )}
 
@@ -763,7 +788,6 @@ export default function App() {
               onAddLog={handleAddServiceLog}
               onEditLog={handleEditServiceLog}
               onDeleteLog={handleDeleteServiceLog}
-              settings={settings}
             />
           )}
 
@@ -776,8 +800,6 @@ export default function App() {
               fuelLogs={fuelLogs}
               onUpdateSettings={handleUpdateSettings}
               onTriggerSync={() => handleTriggerSync(undefined, undefined, undefined, true)}
-              onOpenAuth={() => setActiveTab('settings')}
-              onLogout={handleLogout}
             />
           )}
         </main>

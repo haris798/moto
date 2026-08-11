@@ -5,7 +5,7 @@ import { fetchJarakRecords } from '../lib/supabaseClient';
 import { getSyncItem, getDBItem } from '../lib/dbStorage';
 import { useToast } from './ToastContainer';
 import {
-  Plus, Trash2, Edit3, Calendar, Wrench, Star, X, ArrowUpDown, AlertCircle,
+  Plus, Trash2, Edit3, Wrench, Star, X, ArrowUpDown, AlertCircle,
   Droplets, Gauge, DollarSign, Clock, Shield, Award, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,7 +15,6 @@ interface OilLogsProps {
   onAddLog: (log: Omit<OilLog, 'id'>) => void;
   onEditLog: (id: string, updatedLog: Partial<OilLog>) => void;
   onDeleteLog: (id: string) => void;
-  settings: AppSettings;
 }
 
 // ─── Animation Variants ──────────────────────────────────────────────────────
@@ -35,7 +34,7 @@ const scaleIn = {
 // ─── Component ───────────────────────────────────────────────────────────────
 // Komponen utama untuk mengelola pencatatan riwayat ganti oli kendaraan.
 // Mendukung penambahan, pengeditan, penghapusan, pencarian, dan filter data oli.
-export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog, settings }: OilLogsProps) {
+export default function OilLogs({ logs, onAddLog, onEditLog, onDeleteLog} : OilLogsProps) {
   const { showToast, showConfirm } = useToast();
 
   // State lokal untuk manajemen modal form (Tambah/Edit)

@@ -4,9 +4,9 @@ import { formatIDR } from '../utils/export';
 import { getDBItem, setDBItem } from '../lib/dbStorage';
 import { useToast } from './ToastContainer';
 import {
-  Wrench, Plus, Trash2, Edit3, Calendar, Search, Gauge, DollarSign,
-  ListFilter, Shield, Tag, Package, FileText, X, AlertCircle,
-  ArrowUpDown, Check, Sparkles, ChevronRight, Save
+  Wrench, Plus, Trash2, Edit3, Calendar, Search, DollarSign,
+  ListFilter, Tag, Package, FileText, X, AlertCircle,
+  ArrowUpDown, Check, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -15,7 +15,6 @@ interface ServiceLogsProps {
   onAddLog: (log: Omit<ServiceLog, 'id'>) => void;
   onEditLog: (id: string, updatedLog: Partial<ServiceLog>) => void;
   onDeleteLog: (id: string) => void;
-  settings: AppSettings;
 }
 
 // ─── Preset Quick Options ───────────────────────────────────────────────────

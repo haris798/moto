@@ -5,14 +5,14 @@ import { fetchJarakRecords } from '../lib/supabaseClient';
 import { getDBItem, setDBItem } from '../lib/dbStorage';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  LineChart, Line, AreaChart, Area, ComposedChart
+  Line, AreaChart, Area
 } from 'recharts';
 import {
-  Gauge, Droplets, Fuel, AlertTriangle, CheckCircle2, TrendingUp, Coins, Activity,
-  RefreshCw, Timer, Zap, Flame,
-  Battery, Wrench, Clock, Target, Milestone, Satellite, Calendar,
-  Filter, CalendarDays, SlidersHorizontal, ChevronDown, RotateCcw, Compass, Sparkles,
-  ArrowDownRight, ArrowUpRight, ListFilter
+  Gauge, Droplets, Fuel, TrendingUp, Coins, Activity,
+  Timer, Flame,
+  Battery, Wrench, Clock, Target, Milestone, Satellite,
+  Filter, CalendarDays, Compass,
+  ListFilter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -111,7 +111,6 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const currentMileage = Math.max(maxOilMileage, maxFuelMileage, maxServiceMileage);
   const allMileages = [...oilLogs.map(l => l.mileage), ...fuelLogs.map(l => l.mileage), ...serviceLogs.map(l => l.mileage)].filter(m => m > 0);
   const minMileage = allMileages.length > 0 ? Math.min(...allMileages) : 0;
-  const odometerSpan = currentMileage - minMileage;
 
   const lastOilLog = oilLogs.length > 0 ? oilLogs[0] : null;
   let elapsedKm = 0, remainingKm = settings.oilChangeIntervalKm, oilLifeKmPercent = 100;
@@ -283,8 +282,6 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   thirtyDaysAgo.setHours(0, 0, 0, 0);
 
   const serviceLogs30Days = serviceLogs.filter(l => new Date(l.date) >= thirtyDaysAgo);
-  const serviceCost30Days = serviceLogs30Days.reduce((sum, l) => sum + l.cost, 0);
-  const serviceCount30Days = serviceLogs30Days.length;
 
   const distanceSinceLastOil = (() => {
     if (oilLogs.length === 0) {

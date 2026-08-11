@@ -1,4 +1,4 @@
-import { useState, useMemo, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { FuelLog, AppSettings } from '../types';
 import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
@@ -7,7 +7,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
 import {
-  Plus, Trash2, Edit3, Calendar, Fuel, X, ArrowUpDown, AlertCircle, Sparkles,
+  Plus, Trash2, Edit3, Fuel, X, ArrowUpDown, AlertCircle, Sparkles,
   TrendingUp, Droplets, DollarSign, Gauge, Clock, Satellite, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

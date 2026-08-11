@@ -425,7 +425,7 @@ export default function SettingsTab({
                 className="w-full py-2 sm:py-2.5 pl-2 sm:pl-3 pr-7 sm:pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-xs sm:text-sm font-semibold"
               />
               <span className="absolute inset-y-0 right-0 flex items-center pr-2 sm:pr-4 text-[10px] sm:text-sm font-bold text-slate-400 pointer-events-none">
-                KM
+                km
               </span>
             </div>
           </div>
@@ -598,33 +598,27 @@ export default function SettingsTab({
 
       {/* 4. Telegram Alert Configurations */ }
   <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs">
-    <h3 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3">
-      <Send className="w-5 h-5 text-indigo-500" /> Notifikasi (Telegram Bot API)
-    </h3>
+    <div className="flex items-center justify-between border-b border-slate-50 dark:border-slate-800 pb-3 mb-4">
+      <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+        <Send className="w-5 h-5 text-indigo-500" />Telegram
+      </h3>
+      <label className="relative inline-flex items-center cursor-pointer">
+        <input
+          id="toggle-telegram"
+          type="checkbox"
+          checked={tgEnabled}
+          onChange={(e) => setTgEnabled(e.target.checked)}
+          className="sr-only peer"
+        />
+        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+      </label>
+    </div>
 
     <form onSubmit={handleSaveTelegram} className="space-y-4">
-      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850">
-        <div>
-          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
-            Aktifkan Pengingat Telegram
-          </label>
-        </div>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            id="toggle-telegram"
-            type="checkbox"
-            checked={tgEnabled}
-            onChange={(e) => setTgEnabled(e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
-        </label>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Telegram Bot Token
+            Bot Token
           </label>
           <div className="relative">
             <input
@@ -651,7 +645,7 @@ export default function SettingsTab({
 
         <div>
           <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Telegram Chat ID Pengguna
+            Chat ID
           </label>
           <input
             id="input-telegram-chatid"
@@ -666,11 +660,11 @@ export default function SettingsTab({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Kirim Peringatan Hari Sebelum Ganti Oli
-          </label>
+      <div>
+        <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
+          Sebelum Ganti Oli
+        </label>
+        <div className="grid grid-cols-2 gap-4">
           <div className="relative">
             <input
               id="input-telegram-days-before"
@@ -685,12 +679,7 @@ export default function SettingsTab({
               Hari
             </span>
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-semibold capitalize tracking-wider text-slate-400 mb-1">
-            Kirim Peringatan Jarak Sebelum Ganti Oli (km)
-          </label>
           <div className="relative">
             <input
               id="input-telegram-km-before"
@@ -702,7 +691,7 @@ export default function SettingsTab({
               className="w-full py-2.5 pl-3 pr-12 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm disabled:opacity-50 font-bold"
             />
             <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-[12px] font-bold text-slate-400 pointer-events-none capitalize">
-              KM
+              km
             </span>
           </div>
         </div>
@@ -718,14 +707,8 @@ export default function SettingsTab({
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between gap-3 pt-3 border-t border-slate-50 dark:border-slate-850">
-        {/* Instruction tooltip */}
-        <div className="text-[12px] text-slate-400 max-w-md flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-100 dark:border-slate-850">
-          <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0" />
-          <span>Cari <b>@BotFather</b> di Telegram untuk membuat bot Anda. Dapatkan Token, lalu kirim pesan apa saja ke <b>@userinfobot</b> untuk mengetahui Chat ID Anda.</span>
-        </div>
-
-        <div className="flex gap-2 self-end">
+      <div className="flex justify-end pt-2">
+        <div className="flex gap-2">
           <button
             id="btn-test-telegram"
             type="button"
