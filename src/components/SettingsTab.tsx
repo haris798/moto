@@ -18,8 +18,6 @@ interface SettingsTabProps {
   fuelLogs: FuelLog[];
   onUpdateSettings: (newSettings: AppSettings) => void;
   onTriggerSync: () => Promise<void>;
-  onOpenAuth: () => void;
-  onLogout: () => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -32,8 +30,6 @@ export default function SettingsTab({
   fuelLogs,
   onUpdateSettings,
   onTriggerSync,
-  onOpenAuth,
-  onLogout
 }: SettingsTabProps) {
   const { showToast } = useToast();
 

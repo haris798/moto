@@ -127,9 +127,6 @@ export function exportToPDF(oilLogs: OilLog[], fuelLogs: FuelLog[], serviceLogs:
 
   // Average fuel efficiency
   const logsWithEfficiency = fuelLogs.filter(log => log.efficiency && log.efficiency > 0);
-  const avgEfficiency = logsWithEfficiency.length > 0
-    ? (logsWithEfficiency.reduce((sum, log) => sum + (log.efficiency || 0), 0) / logsWithEfficiency.length).toFixed(2)
-    : '-';
 
   const maxMileage = Math.max(
     oilLogs.length > 0 ? oilLogs[0].mileage : 0,

@@ -66,7 +66,6 @@ export default function ServiceLogs({
   onAddLog,
   onEditLog,
   onDeleteLog,
-  settings
 }: ServiceLogsProps) {
   const { showToast } = useToast();
 

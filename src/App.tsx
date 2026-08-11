@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { OilLog, FuelLog, ServiceLog, AppSettings, SyncStatus } from './types';
 import { getSupabaseClient, syncWithSupabase } from './lib/supabaseClient';
 import { initIndexedDB, getDBItem, setDBItem, removeDBItem } from './lib/dbStorage';
@@ -749,59 +750,71 @@ export default function App() {
 
         {/* 3. Main Stage Container */}
         <main className="flex-1 p-6 sm:p-8 pb-16 md:pb-8 max-w-7xl w-full mx-auto space-y-6">
-          {activeTab === 'dashboard' && (
-            <Dashboard
-              oilLogs={oilLogs}
-              fuelLogs={fuelLogs}
-              serviceLogs={serviceLogs}
-              onNavigate={(tab) => {
-                setActiveTab(tab);
-                setTimeout(() => {
-                  const btnId = tab === 'oil' ? 'btn-add-oil-log' : tab === 'fuel' ? 'btn-add-fuel-log' : 'btn-add-service-log';
-                  document.getElementById(btnId)?.click();
-                }, 100);
-              }}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === 'dashboard' && (
+                <Dashboard
+                  oilLogs={oilLogs}
+                  fuelLogs={fuelLogs}
+                  serviceLogs={serviceLogs}
+                  settings={settings}
+                  onNavigate={(tab) => {
+                    setActiveTab(tab);
+                    setTimeout(() => {
+                      const btnId = tab === 'oil' ? 'btn-add-oil-log' : tab === 'fuel' ? 'btn-add-fuel-log' : 'btn-add-service-log';
+                      document.getElementById(btnId)?.click();
+                    }, 100);
+                  }}
+                />
+              )}
 
-          {activeTab === 'oil' && (
-            <OilLogs
-              logs={oilLogs}
-              onAddLog={handleAddOilLog}
-              onEditLog={handleEditOilLog}
-              onDeleteLog={handleDeleteOilLog}
-            />
-          )}
+              {activeTab === 'oil' && (
+                <OilLogs
+                  logs={oilLogs}
+                  onAddLog={handleAddOilLog}
+                  onEditLog={handleEditOilLog}
+                  onDeleteLog={handleDeleteOilLog}
+                />
+              )}
 
-          {activeTab === 'fuel' && (
-            <FuelLogs
-              logs={fuelLogs}
-              onAddLog={handleAddFuelLog}
-              onEditLog={handleEditFuelLog}
-              onDeleteLog={handleDeleteFuelLog}
-            />
-          )}
+              {activeTab === 'fuel' && (
+                <FuelLogs
+                  logs={fuelLogs}
+                  onAddLog={handleAddFuelLog}
+                  onEditLog={handleEditFuelLog}
+                  onDeleteLog={handleDeleteFuelLog}
+                  settings={settings}
+                />
+              )}
 
-          {activeTab === 'service' && (
-            <ServiceLogs
-              logs={serviceLogs}
-              onAddLog={handleAddServiceLog}
-              onEditLog={handleEditServiceLog}
-              onDeleteLog={handleDeleteServiceLog}
-            />
-          )}
+              {activeTab === 'service' && (
+                <ServiceLogs
+                  logs={serviceLogs}
+                  onAddLog={handleAddServiceLog}
+                  onEditLog={handleEditServiceLog}
+                  onDeleteLog={handleDeleteServiceLog}
+                />
+              )}
 
-          {activeTab === 'settings' && (
-            <SettingsTab
-              settings={settings}
-              syncStatus={syncStatus}
-              user={user}
-              oilLogs={oilLogs}
-              fuelLogs={fuelLogs}
-              onUpdateSettings={handleUpdateSettings}
-              onTriggerSync={() => handleTriggerSync(undefined, undefined, undefined, true)}
-            />
-          )}
+              {activeTab === 'settings' && (
+                <SettingsTab
+                  settings={settings}
+                  syncStatus={syncStatus}
+                  user={user}
+                  oilLogs={oilLogs}
+                  fuelLogs={fuelLogs}
+                  onUpdateSettings={handleUpdateSettings}
+                  onTriggerSync={() => handleTriggerSync(undefined, undefined, undefined, true)}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
 
         {/* 4. Geometric Footer / Bottom Bar */}
