@@ -30,6 +30,12 @@ const KNOWN_KEYS = [
 export async function initIndexedDB(): Promise<void> {
   if (isMigrated) return;
   try {
+    // Check if IndexedDB is available (works offline, in PWA, and in private browsing)
+    if (typeof indexedDB === 'undefined') {
+      console.warn('[IndexedDB] Not available — using memory cache only.');
+      isMigrated = true;
+      return;
+    }
     const dbKeys = await keys();
     for (const key of KNOWN_KEYS) {
       if (dbKeys.includes(key)) {
@@ -55,6 +61,8 @@ export async function initIndexedDB(): Promise<void> {
     isMigrated = true;
   } catch (err) {
     console.warn('[IndexedDB] Inisialisasi/Migrasi warn:', err);
+    // Mark as migrated anyway so the app can still function from memory cache + localStorage
+    isMigrated = true;
   }
 }
 

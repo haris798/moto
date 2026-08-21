@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { OilLog, FuelLog, ServiceLog, AppSettings, SyncStatus } from './types';
 import { getSupabaseClient, syncWithSupabase } from './lib/supabaseClient';
@@ -57,6 +57,17 @@ export default function App() {
     pendingSyncCount: 0,
     isSyncing: false,
   });
+
+  // ── Sync Infrastructure: refs prevent stale closures & enable debounced background sync ──
+  const oilLogsRef = useRef(oilLogs);
+  const fuelLogsRef = useRef(fuelLogs);
+  const serviceLogsRef = useRef(serviceLogs);
+  const settingsRef = useRef(settings);
+  const userRef = useRef(user);
+  const isOnlineRef = useRef(isOnline);
+  const syncLockRef = useRef(false);
+  const pendingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SYNC_COOLDOWN_MS = 2000; // minimum ms between sync cycles
 
   const tabsList = [
     { id: 'dashboard', label: 'Dashboard', icon: Gauge },
@@ -176,6 +187,14 @@ export default function App() {
     }
   }, []);
 
+  // Keep refs in sync with state (used by sync to avoid stale closures)
+  useEffect(() => { oilLogsRef.current = oilLogs; }, [oilLogs]);
+  useEffect(() => { fuelLogsRef.current = fuelLogs; }, [fuelLogs]);
+  useEffect(() => { serviceLogsRef.current = serviceLogs; }, [serviceLogs]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
+
   // Update pending sync count whenever logs change or deletions are queued
   useEffect(() => {
     getDBItem<string[]>('deleted_log_ids', []).then(deletedIds => {
@@ -191,12 +210,10 @@ export default function App() {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      // Auto-trigger sync if online & logged in
-      if (settings.supabase.connected && user) {
-        handleTriggerSync();
-      }
     };
-    const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -205,7 +222,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [settings.supabase.connected, user, oilLogs, fuelLogs]);
+  }, []);
 
   // 4. Pengecekan Peringatan Telegram
   // Akan diperiksa secara periodik atau setelah pembaruan log untuk mengirimkan notifikasi
@@ -252,6 +269,9 @@ export default function App() {
       await setDBItem('supabase_url', newSettings.supabase.url);
       await setDBItem('supabase_anon_key', newSettings.supabase.anonKey);
     }
+
+    // Schedule a background sync after settings change
+    scheduleBackgroundSync();
   }, []);
 
   const handleToggleDarkMode = useCallback(async () => {
@@ -268,29 +288,45 @@ export default function App() {
     });
   }, []);
 
-  // Perform full database cloud sync
-  const handleTriggerSync = useCallback(async (
-    customOilLogs?: OilLog[],
-    customFuelLogs?: FuelLog[],
-    customServiceLogs?: ServiceLog[],
-    isInteractive: boolean = false
-  ) => {
-    if (!isOnline) {
+  // ── Core Sync Engine (uses refs so it never reads stale state) ──
+  const runSync = useCallback(async (isInteractive: boolean = false) => {
+    // Guard: prevent concurrent syncs
+    if (syncLockRef.current) {
+      if (isInteractive) {
+        showToast('Sinkronisasi sedang berjalan, harap tunggu.', 'info', 'Sinkron Aktif');
+      }
+      return;
+    }
+    // Guard: must be online
+    if (!isOnlineRef.current) {
       if (isInteractive) {
         showToast('Tidak ada koneksi internet. Sinkronisasi ditunda.', 'warning', 'Koneksi Terputus');
       }
       return;
     }
+    // Guard: must have Supabase connected and user logged in
+    if (!settingsRef.current.supabase.connected || !userRef.current) {
+      return;
+    }
+
+    // Check cooldown to prevent rapid-fire syncs
+    const now = Date.now();
+    if (!isInteractive && now - (syncRefLastSyncTime) < SYNC_COOLDOWN_MS) {
+      return; // within cooldown window, skip
+    }
+
+    syncLockRef.current = true;
     setSyncStatus(prev => ({ ...prev, isSyncing: true }));
 
     try {
-      const logsToSyncOil = customOilLogs || oilLogs;
-      const logsToSyncFuel = customFuelLogs || fuelLogs;
-      const logsToSyncService = customServiceLogs || serviceLogs;
-      const result = await syncWithSupabase(logsToSyncOil, logsToSyncFuel, undefined, logsToSyncService);
+      const result = await syncWithSupabase(
+        oilLogsRef.current,
+        fuelLogsRef.current,
+        undefined,
+        serviceLogsRef.current
+      );
 
       if (result.success) {
-        // Update local logs with merged data
         setOilLogs(result.syncedOilLogs);
         setFuelLogs(result.syncedFuelLogs);
         if (result.syncedServiceLogs) {
@@ -310,6 +346,8 @@ export default function App() {
           isSyncing: false
         });
 
+        syncRefLastSyncTime = Date.now();
+
         if (isInteractive) {
           showToast('Sinkronisasi data cloud berhasil!', 'success', 'Sinkron Selesai');
         }
@@ -324,8 +362,45 @@ export default function App() {
       if (isInteractive) {
         showToast(`Gagal sinkronisasi: ${e.message || e}`, 'error', 'Gagal Sinkron');
       }
+    } finally {
+      syncLockRef.current = false;
     }
-  }, [isOnline, oilLogs, fuelLogs, serviceLogs, settings.supabase.connected, showToast]);
+  }, [showToast]);
+
+  // Track last sync time outside of React state for lightweight cooldown check
+  let syncRefLastSyncTime = 0;
+
+  // ── Debounced Background Sync ──
+  // Schedules a sync after SYNC_COOLDOWN_MS. Each new call resets the timer,
+  // so rapid add/edit/delete operations collapse into a single sync cycle.
+  const scheduleBackgroundSync = useCallback(() => {
+    if (pendingSyncTimerRef.current) {
+      clearTimeout(pendingSyncTimerRef.current);
+    }
+    pendingSyncTimerRef.current = setTimeout(() => {
+      pendingSyncTimerRef.current = null;
+      runSync(false);
+    }, SYNC_COOLDOWN_MS);
+  }, [runSync]);
+
+  // Public sync trigger — used by manual "Sinkron Sekarang" button
+  const handleTriggerSync = useCallback(async (
+    _customOilLogs?: OilLog[],
+    _customFuelLogs?: FuelLog[],
+    _customServiceLogs?: ServiceLog[],
+    isInteractive: boolean = false
+  ) => {
+    await runSync(isInteractive);
+  }, [runSync]);
+
+  // Cleanup pending sync timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingSyncTimerRef.current) {
+        clearTimeout(pendingSyncTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleLogout = async () => {
     showConfirm({
@@ -354,163 +429,120 @@ export default function App() {
     });
   };
 
-  // Log handlers
+  // ── Log Handlers (fire-and-forget background sync via debounce) ──
   const handleAddOilLog = async (logData: Omit<OilLog, 'id'>) => {
     const newLog: OilLog = {
       ...logData,
       id: generateUUID(),
-      user_id: user?.id,
+      user_id: userRef.current?.id,
       updated_at: new Date().toISOString()
     };
-    const updated = [newLog, ...oilLogs];
+    const updated = [newLog, ...oilLogsRef.current];
     setOilLogs(updated);
     await setDBItem('oil_tracker_oil_logs', updated);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(updated, undefined);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleEditOilLog = async (id: string, updatedData: Partial<OilLog>) => {
-    const updated = oilLogs.map(log => {
+    const updated = oilLogsRef.current.map(log => {
       if (log.id === id) {
-        return {
-          ...log,
-          ...updatedData,
-          updated_at: new Date().toISOString()
-        };
+        return { ...log, ...updatedData, updated_at: new Date().toISOString() };
       }
       return log;
     });
     setOilLogs(updated);
     await setDBItem('oil_tracker_oil_logs', updated);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(updated, undefined);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleDeleteOilLog = async (id: string) => {
-    const updated = oilLogs.filter(log => log.id !== id);
+    const updated = oilLogsRef.current.filter(log => log.id !== id);
     setOilLogs(updated);
     await setDBItem('oil_tracker_oil_logs', updated);
-
-    // Queue deletion id
     const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
     await setDBItem('deleted_log_ids', deletedIds);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(updated, undefined);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleAddFuelLog = async (logData: Omit<FuelLog, 'id'>) => {
     const newLog: FuelLog = {
       ...logData,
       id: generateUUID(),
-      user_id: user?.id,
+      user_id: userRef.current?.id,
       updated_at: new Date().toISOString()
     };
-    const updated = [newLog, ...fuelLogs];
+    const updated = [newLog, ...fuelLogsRef.current];
     setFuelLogs(updated);
     await setDBItem('oil_tracker_fuel_logs', updated);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(undefined, updated);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleEditFuelLog = async (id: string, updatedData: Partial<FuelLog>) => {
-    const updated = fuelLogs.map(log => {
+    const updated = fuelLogsRef.current.map(log => {
       if (log.id === id) {
-        return {
-          ...log,
-          ...updatedData,
-          updated_at: new Date().toISOString()
-        };
+        return { ...log, ...updatedData, updated_at: new Date().toISOString() };
       }
       return log;
     });
     setFuelLogs(updated);
     await setDBItem('oil_tracker_fuel_logs', updated);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(undefined, updated);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleDeleteFuelLog = async (id: string) => {
-    const updated = fuelLogs.filter(log => log.id !== id);
+    const updated = fuelLogsRef.current.filter(log => log.id !== id);
     setFuelLogs(updated);
     await setDBItem('oil_tracker_fuel_logs', updated);
-
-    // Queue deletion id
     const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
     await setDBItem('deleted_log_ids', deletedIds);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(undefined, updated);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleAddServiceLog = async (logData: Omit<ServiceLog, 'id'>) => {
     const newLog: ServiceLog = {
       ...logData,
       id: generateUUID(),
-      user_id: user?.id,
+      user_id: userRef.current?.id,
       updated_at: new Date().toISOString()
     };
-    const updated = [newLog, ...serviceLogs];
+    const updated = [newLog, ...serviceLogsRef.current];
     setServiceLogs(updated);
     await setDBItem('oil_tracker_service_logs', updated);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(undefined, undefined, updated);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleEditServiceLog = async (id: string, updatedData: Partial<ServiceLog>) => {
-    const updated = serviceLogs.map(log => {
+    const updated = serviceLogsRef.current.map(log => {
       if (log.id === id) {
-        return {
-          ...log,
-          ...updatedData,
-          updated_at: new Date().toISOString()
-        };
+        return { ...log, ...updatedData, updated_at: new Date().toISOString() };
       }
       return log;
     });
     setServiceLogs(updated);
     await setDBItem('oil_tracker_service_logs', updated);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(undefined, undefined, updated);
-    }
+    scheduleBackgroundSync();
   };
 
   const handleDeleteServiceLog = async (id: string) => {
-    const updated = serviceLogs.filter(log => log.id !== id);
+    const updated = serviceLogsRef.current.filter(log => log.id !== id);
     setServiceLogs(updated);
     await setDBItem('oil_tracker_service_logs', updated);
-
-    // Queue deletion id
     const deletedIds: string[] = await getDBItem<string[]>('deleted_log_ids', []);
     deletedIds.push(id);
     await setDBItem('deleted_log_ids', deletedIds);
-
-    if (settings.supabase.connected && user) {
-      handleTriggerSync(undefined, undefined, updated);
-    }
+    scheduleBackgroundSync();
   };
 
-  // Auto sync when online and logged in (e.g. on initial load or after login)
+  // ── Auto-sync when coming online, user logs in, or Supabase connects ──
   useEffect(() => {
-    if (isOnline && user && settings.supabase.connected) {
-      handleTriggerSync();
+    if (isOnlineRef.current && userRef.current && settingsRef.current.supabase.connected) {
+      // Small delay to let state settle after login/reconnect
+      const t = setTimeout(() => runSync(false), 500);
+      return () => clearTimeout(t);
     }
-  }, [isOnline, user, settings.supabase.connected]);
+  }, [isOnline, user, settings.supabase.connected, runSync]);
 
   return (
     <div className="h-[100dvh] bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 transition-colors duration-300 flex flex-col md:flex-row overflow-hidden">
