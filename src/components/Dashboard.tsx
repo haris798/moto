@@ -12,7 +12,7 @@ import {
   Timer, Flame,
   Battery, Wrench, Clock, Target, Milestone, Satellite,
   Filter, CalendarDays, Compass,
-  ListFilter
+  ListFilter, Eye, X, Search, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -228,6 +228,9 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   // ── Jarak Tempuh (bulanan) ───────────────────────────────────────────────
   const [jarakData, setJarakData] = useState<Jarak[]>([]);
   const [jarakLoading, setJarakLoading] = useState(false);
+  const [showJarakDetailModal, setShowJarakDetailModal] = useState(false);
+  const [selectedJarakMonth, setSelectedJarakMonth] = useState<string>('');
+  const [jarakSearchQuery, setJarakSearchQuery] = useState<string>('');
 
   const loadJarak = async () => {
     // 1. Load from local DB (IndexedDB) immediately
@@ -263,6 +266,43 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const thisMonthKey = getMonthYearKey(new Date().toISOString());
   const thisMonthKm = jarakMonthMap.get(thisMonthKey) || 0;
   const totalKm = jarakData.reduce((sum, r) => sum + r.total_km, 0);
+
+  // Modal Jarak Detail Data Processing
+  const activeDetailMonthKey = selectedJarakMonth || thisMonthKey;
+  const availableMonthKeys = Array.from(new Set([thisMonthKey, ...jarakData.map(r => getMonthYearKey(r.date))]));
+
+  const filteredJarakForModal = jarakData.filter(r => getMonthYearKey(r.date) === activeDetailMonthKey);
+  const dailyJarakMap = new Map<string, { dateStr: string; totalKm: number; sources: string[] }>();
+
+  for (const r of filteredJarakForModal) {
+    const dStr = r.date.includes('T') ? r.date.split('T')[0] : r.date;
+    const existing = dailyJarakMap.get(dStr);
+    if (existing) {
+      existing.totalKm += r.total_km;
+      if (r.source && !existing.sources.includes(r.source)) existing.sources.push(r.source);
+    } else {
+      dailyJarakMap.set(dStr, {
+        dateStr: dStr,
+        totalKm: r.total_km,
+        sources: r.source ? [r.source] : ['manual']
+      });
+    }
+  }
+
+  let groupedDailyJarakList = Array.from(dailyJarakMap.values())
+    .sort((a, b) => new Date(b.dateStr).getTime() - new Date(a.dateStr).getTime());
+
+  if (jarakSearchQuery.trim()) {
+    const q = jarakSearchQuery.toLowerCase();
+    groupedDailyJarakList = groupedDailyJarakList.filter(item =>
+      item.dateStr.includes(q) || item.sources.some(s => s.toLowerCase().includes(q))
+    );
+  }
+
+  const modalMonthTotalKm = filteredJarakForModal.reduce((sum, r) => sum + r.total_km, 0);
+  const maxDailyKm = groupedDailyJarakList.length > 0 ? Math.max(...groupedDailyJarakList.map(item => item.totalKm)) : 0;
+  const activeDaysCount = groupedDailyJarakList.length;
+  const avgDailyKm = activeDaysCount > 0 ? modalMonthTotalKm / activeDaysCount : 0;
 
   // ── Filter Rentang Tanggal (Date Range Filter) ─────────────────────────────
   // Fitur ini memungkinkan pengguna untuk memfilter data biaya, oli, dan jarak tempuh 
@@ -470,15 +510,25 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
           {/* Mini stats row */}
           <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: Milestone, label: 'Jarak Bulan Ini', value: `${thisMonthKm.toLocaleString('id-ID')} km` },
+              { icon: Milestone, label: 'Jarak Bulan Ini', value: `${thisMonthKm.toLocaleString('id-ID')} km`, isJarak: true },
               { icon: Target, label: 'Efisiensi BBM', value: avgEfficiency > 0 ? `${avgEfficiency.toFixed(1)} km/L` : '-' },
               { icon: Flame, label: 'BBM Bulan ini', value: formatIDR(currentMonthFuelCost) },
               { icon: Timer, label: 'BBM Bulan lalu', value: formatIDR(lastMonthFuelCost) },
             ].map((item, i) => (
-              <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-                <div className="flex items-center gap-2 text-indigo-200/70 text-[11px] font-medium tracking-wider mb-1">
-                  <item.icon className="w-3 h-3" />
-                  {item.label}
+              <div
+                key={i}
+                onClick={() => item.isJarak && setShowJarakDetailModal(true)}
+                className={`bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10 ${item.isJarak ? 'cursor-pointer hover:bg-white/20 transition-all group' : ''}`}
+                title={item.isJarak ? 'Klik untuk melihat detil riwayat per tanggal' : undefined}
+              >
+                <div className="flex items-center justify-between gap-1 text-indigo-200/70 text-[11px] font-medium tracking-wider mb-1">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <item.icon className="w-3 h-3 shrink-0" />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.isJarak && (
+                    <Eye className="w-3.5 h-3.5 text-cyan-300 group-hover:scale-110 transition-transform shrink-0" />
+                  )}
                 </div>
                 <span className="text-sm md:text-base font-bold">{item.value}</span>
               </div>
@@ -779,11 +829,20 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                 <div className={`p-2.5 rounded-xl ${metric.bgLight} ${metric.iconColor} transition-transform duration-300 group-hover:scale-110`}>
                   <metric.icon className="w-5 h-5" />
                 </div>
-                {'prefixFn' in metric && metric.value > 0 && (
+                {metric.label === 'Jarak Bulan Ini' ? (
+                  <button
+                    onClick={() => setShowJarakDetailModal(true)}
+                    className="px-2.5 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/50 dark:hover:bg-cyan-900/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200/60 dark:border-cyan-900/40 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:scale-105"
+                    title="Lihat Riwayat Per Tanggal"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                    <span>Detil</span>
+                  </button>
+                ) : 'prefixFn' in metric && metric.value > 0 ? (
                   <span className="text-[11px] font-bold text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-lg">
                     {metric.prefixFn()}
                   </span>
-                )}
+                ) : null}
               </div>
               <span className="block text-xs font-medium text-slate-400 dark:text-slate-500 tracking-wider mb-1">
                 {metric.label}
@@ -1244,6 +1303,169 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
           </div>
         </motion.div>
       </div>
+
+      {/* ═══════════════════════ 7. MODAL RIWAYAT JARAK HARIAN ═══════════════════════ */}
+      <AnimatePresence>
+        {showJarakDetailModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+              className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col"
+            >
+              {/* Header Modal */}
+              <div className="p-4 sm:p-6 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-2xl border border-white/20">
+                    <Milestone className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold font-display">
+                      Riwayat Jarak Tempuh Harian
+                    </h3>
+                    <p className="text-xs text-cyan-100/80">
+                      Rincian catatan kilometer berkendara per tanggal
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowJarakDetailModal(false)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Filter & Selector Bar */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+                {/* Month Dropdown */}
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                  <select
+                    value={activeDetailMonthKey}
+                    onChange={(e) => setSelectedJarakMonth(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-2xs cursor-pointer"
+                  >
+                    {availableMonthKeys.map(key => (
+                      <option key={key} value={key} className="dark:bg-slate-900">
+                        Bulan {key}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Search Filter */}
+                <div className="relative flex-1 sm:max-w-xs">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Cari tanggal (YYYY-MM-DD)..."
+                    value={jarakSearchQuery}
+                    onChange={(e) => setJarakSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  />
+                </div>
+              </div>
+
+              {/* Ringkasan Modal */}
+              <div className="p-4 grid grid-cols-3 gap-2 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+                <div className="p-2.5 rounded-xl bg-cyan-50/80 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900/40 text-center">
+                  <span className="text-[10px] font-semibold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider block">Total Bulan Ini</span>
+                  <span className="text-base sm:text-lg font-bold text-cyan-900 dark:text-cyan-200">{modalMonthTotalKm.toLocaleString('id-ID')} km</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 text-center">
+                  <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider block">Hari Aktif</span>
+                  <span className="text-base sm:text-lg font-bold text-blue-900 dark:text-blue-200">{activeDaysCount} Hari</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-center">
+                  <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider block">Rata-rata/Hari</span>
+                  <span className="text-base sm:text-lg font-bold text-indigo-900 dark:text-indigo-200">{avgDailyKm.toFixed(1)} km</span>
+                </div>
+              </div>
+
+              {/* Main List */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-3 flex-1">
+                {groupedDailyJarakList.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 dark:text-slate-500">
+                    <Milestone className="w-10 h-10 mx-auto mb-2 opacity-40 text-cyan-500" />
+                    <p className="text-sm font-semibold">Tidak Ada Catatan Jarak</p>
+                    <p className="text-xs text-slate-400 mt-1">Belum ada riwayat perjalanan yang tercatat pada bulan/pencarian ini.</p>
+                  </div>
+                ) : (
+                  groupedDailyJarakList.map((item, index) => {
+                    const pct = maxDailyKm > 0 ? Math.min(100, Math.round((item.totalKm / maxDailyKm) * 100)) : 0;
+                    const dateObj = new Date(item.dateStr.includes('T') ? item.dateStr : `${item.dateStr}T00:00:00`);
+                    const formattedDateStr = isNaN(dateObj.getTime())
+                      ? item.dateStr
+                      : dateObj.toLocaleDateString('id-ID', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        });
+
+                    return (
+                      <div
+                        key={item.dateStr + index}
+                        className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 hover:border-cyan-500/40 transition-all space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 shrink-0" />
+                            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
+                              {formattedDateStr}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {item.sources.map(src => (
+                              <span
+                                key={src}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                                  src === 'gps'
+                                    ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20'
+                                    : src === 'telegram'
+                                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20'
+                                    : 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border border-slate-500/20'
+                                }`}
+                              >
+                                {src === 'gps' && <Satellite className="w-2.5 h-2.5" />}
+                                {src}
+                              </span>
+                            ))}
+                            <span className="text-sm sm:text-base font-extrabold text-cyan-600 dark:text-cyan-400 tabular-nums">
+                              {item.totalKm.toFixed(1)} <span className="text-xs font-normal text-slate-400">km</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full bg-slate-200/70 dark:bg-slate-700/60 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-end shrink-0">
+                <button
+                  onClick={() => setShowJarakDetailModal(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
