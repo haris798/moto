@@ -66,6 +66,7 @@ export default function App() {
   const userRef = useRef(user);
   const isOnlineRef = useRef(isOnline);
   const syncLockRef = useRef(false);
+  const lastSyncTimeRef = useRef(0);
   const pendingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SYNC_COOLDOWN_MS = 2000; // minimum ms between sync cycles
 
@@ -311,7 +312,7 @@ export default function App() {
 
     // Check cooldown to prevent rapid-fire syncs
     const now = Date.now();
-    if (!isInteractive && now - (syncRefLastSyncTime) < SYNC_COOLDOWN_MS) {
+    if (!isInteractive && now - lastSyncTimeRef.current < SYNC_COOLDOWN_MS) {
       return; // within cooldown window, skip
     }
 
@@ -346,7 +347,7 @@ export default function App() {
           isSyncing: false
         });
 
-        syncRefLastSyncTime = Date.now();
+        lastSyncTimeRef.current = Date.now();
 
         if (isInteractive) {
           showToast('Sinkronisasi data cloud berhasil!', 'success', 'Sinkron Selesai');
@@ -366,9 +367,6 @@ export default function App() {
       syncLockRef.current = false;
     }
   }, [showToast]);
-
-  // Track last sync time outside of React state for lightweight cooldown check
-  let syncRefLastSyncTime = 0;
 
   // ── Debounced Background Sync ──
   // Schedules a sync after SYNC_COOLDOWN_MS. Each new call resets the timer,

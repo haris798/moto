@@ -9,8 +9,8 @@ let currentKey = '';
 // Mengelola inisialisasi dan pengambilan instance dari Supabase Client
 export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClient | null {
   // Try to load from provided args or IndexedDB/local storage
-  const defaultUrl = 'https://pcoyvfhcniscynjkndlw.supabase.co';
-  const defaultKey = 'sb_publishable_4HYaHZhOIECG56Eccpe4sA_xj-Ecy9n';
+  const defaultUrl = (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || 'https://pcoyvfhcniscynjkndlw.supabase.co';
+  const defaultKey = (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || 'sb_publishable_4HYaHZhOIECG56Eccpe4sA_xj-Ecy9n';
 
   const finalUrl = url || getSyncItem('supabase_url', defaultUrl);
   const finalKey = anonKey || getSyncItem('supabase_anon_key', defaultKey);
@@ -160,13 +160,14 @@ export async function syncWithSupabase(
 
     const mergedOilLogs: OilLog[] = [...safeLocalOilLogs];
     const remoteOilMap = new Map<string, any>(safeRemoteOilLogs.map(item => [item.id, item]));
+    const oilUpsertBatch: any[] = [];
 
     // Check local vs remote
     for (const local of safeLocalOilLogs) {
       const remote = remoteOilMap.get(local.id);
       if (!remote) {
-        // Exists locally but not remotely -> Upload to remote (upsert)
-        const { error: insErr } = await client.from('oil_logs').upsert({
+        // Exists locally but not remotely -> Add to batch
+        oilUpsertBatch.push({
           id: local.id,
           user_id: userId,
           date: local.date || new Date().toISOString().split('T')[0],
@@ -178,14 +179,9 @@ export async function syncWithSupabase(
           rating: isFinite(local.rating) && !isNaN(local.rating) ? Number(local.rating) : 5,
           updated_at: local.updated_at || new Date().toISOString()
         });
-        if (insErr) {
-          console.error('Gagal upload oli log:', insErr.message || insErr);
-        } else {
-          // Sync user_id back to local merged list so it's persisted properly
-          const index = mergedOilLogs.findIndex(item => item.id === local.id);
-          if (index !== -1) {
-            mergedOilLogs[index].user_id = userId;
-          }
+        const index = mergedOilLogs.findIndex(item => item.id === local.id);
+        if (index !== -1) {
+          mergedOilLogs[index].user_id = userId;
         }
       } else {
         // Exists in both -> Compare timestamps
@@ -193,8 +189,10 @@ export async function syncWithSupabase(
         const remoteTime = new Date(remote.updated_at || 0).getTime();
 
         if (localTime > remoteTime) {
-          // Local is newer -> Update remote
-          await client.from('oil_logs').update({
+          // Local is newer -> Add to batch
+          oilUpsertBatch.push({
+            id: local.id,
+            user_id: userId,
             date: local.date || new Date().toISOString().split('T')[0],
             mileage: isFinite(local.mileage) && !isNaN(local.mileage) ? Math.round(Number(local.mileage)) : 0,
             cost: isFinite(local.cost) && !isNaN(local.cost) ? Number(local.cost) : 0,
@@ -203,7 +201,7 @@ export async function syncWithSupabase(
             notes: local.notes || '',
             rating: isFinite(local.rating) && !isNaN(local.rating) ? Number(local.rating) : 5,
             updated_at: local.updated_at || new Date().toISOString()
-          }).eq('id', local.id).eq('user_id', userId);
+          });
         } else if (remoteTime > localTime) {
           // Remote is newer -> Update local list
           const index = mergedOilLogs.findIndex(item => item.id === local.id);
@@ -223,6 +221,13 @@ export async function syncWithSupabase(
             };
           }
         }
+      }
+    }
+
+    if (oilUpsertBatch.length > 0) {
+      const { error: insErr } = await client.from('oil_logs').upsert(oilUpsertBatch);
+      if (insErr) {
+        console.error('Gagal upload bulk oli log:', insErr.message || insErr);
       }
     }
 
@@ -266,6 +271,7 @@ export async function syncWithSupabase(
 
     const mergedFuelLogs: FuelLog[] = [...safeLocalFuelLogs];
     const remoteFuelMap = new Map<string, any>(safeRemoteFuelLogs.map(item => [item.id, item]));
+    const fuelUpsertBatch: any[] = [];
 
     for (const local of safeLocalFuelLogs) {
       const remote = remoteFuelMap.get(local.id);
@@ -281,8 +287,8 @@ export async function syncWithSupabase(
       const safeCost = isFinite(local.cost) && !isNaN(local.cost) ? Math.max(0, Number(local.cost)) : 0;
 
       if (!remote) {
-        // Exists locally but not remotely -> Upload (upsert)
-        const { error: insErr } = await client.from('fuel_logs').upsert({
+        // Exists locally but not remotely -> Add to batch
+        fuelUpsertBatch.push({
           id: local.id,
           user_id: userId,
           date: local.date || new Date().toISOString().split('T')[0],
@@ -294,15 +300,10 @@ export async function syncWithSupabase(
           notes: local.notes || '',
           updated_at: local.updated_at || new Date().toISOString()
         });
-        if (insErr) {
-          console.error('Gagal upload bbm log:', insErr.message || insErr);
-        } else {
-          // Sync user_id back to local merged list so it's persisted properly
-          const index = mergedFuelLogs.findIndex(item => item.id === local.id);
-          if (index !== -1) {
-            mergedFuelLogs[index].user_id = userId;
-            mergedFuelLogs[index].liters = safeLiters;
-          }
+        const index = mergedFuelLogs.findIndex(item => item.id === local.id);
+        if (index !== -1) {
+          mergedFuelLogs[index].user_id = userId;
+          mergedFuelLogs[index].liters = safeLiters;
         }
       } else {
         // Compare timestamps
@@ -310,8 +311,10 @@ export async function syncWithSupabase(
         const remoteTime = new Date(remote.updated_at || 0).getTime();
 
         if (localTime > remoteTime) {
-          // Local is newer -> Update remote
-          await client.from('fuel_logs').update({
+          // Local is newer -> Add to batch
+          fuelUpsertBatch.push({
+            id: local.id,
+            user_id: userId,
             date: local.date || new Date().toISOString().split('T')[0],
             mileage: safeMileage,
             liters: safeLiters,
@@ -320,7 +323,7 @@ export async function syncWithSupabase(
             efficiency: safeEfficiency,
             notes: local.notes || '',
             updated_at: local.updated_at || new Date().toISOString()
-          }).eq('id', local.id).eq('user_id', userId);
+          });
         } else if (remoteTime > localTime) {
           // Remote is newer -> Update local
           const index = mergedFuelLogs.findIndex(item => item.id === local.id);
@@ -340,6 +343,13 @@ export async function syncWithSupabase(
             };
           }
         }
+      }
+    }
+
+    if (fuelUpsertBatch.length > 0) {
+      const { error: insErr } = await client.from('fuel_logs').upsert(fuelUpsertBatch);
+      if (insErr) {
+        console.error('Gagal upload bulk bbm log:', insErr.message || insErr);
       }
     }
 
@@ -379,12 +389,13 @@ export async function syncWithSupabase(
 
     const mergedServiceLogs: ServiceLog[] = [...safeLocalServiceLogs];
     const remoteServiceMap = new Map<string, any>(safeRemoteServiceLogs.map(item => [item.id, item]));
+    const serviceUpsertBatch: any[] = [];
 
     for (const local of safeLocalServiceLogs) {
       const remote = remoteServiceMap.get(local.id);
       if (!remote) {
         // Upsert to remote
-        await client.from('service_logs').upsert({
+        serviceUpsertBatch.push({
           id: local.id,
           user_id: userId,
           date: local.date || new Date().toISOString().split('T')[0],
@@ -401,7 +412,9 @@ export async function syncWithSupabase(
         const remoteTime = new Date(remote.updated_at || 0).getTime();
 
         if (localTime > remoteTime) {
-          await client.from('service_logs').update({
+          serviceUpsertBatch.push({
+            id: local.id,
+            user_id: userId,
             date: local.date || new Date().toISOString().split('T')[0],
             mileage: isFinite(local.mileage) && !isNaN(local.mileage) ? Math.round(Number(local.mileage)) : 0,
             cost: isFinite(local.cost) && !isNaN(local.cost) ? Number(local.cost) : 0,
@@ -410,7 +423,7 @@ export async function syncWithSupabase(
             parts_changed: Array.isArray(local.parts_changed) ? local.parts_changed : [],
             notes: local.notes || '',
             updated_at: local.updated_at || new Date().toISOString()
-          }).eq('id', local.id).eq('user_id', userId);
+          });
         } else if (remoteTime > localTime) {
           const index = mergedServiceLogs.findIndex(item => item.id === local.id);
           if (index !== -1) {
@@ -429,6 +442,13 @@ export async function syncWithSupabase(
             };
           }
         }
+      }
+    }
+
+    if (serviceUpsertBatch.length > 0) {
+      const { error: insErr } = await client.from('service_logs').upsert(serviceUpsertBatch);
+      if (insErr) {
+        console.error('Gagal upload bulk service log:', insErr.message || insErr);
       }
     }
 
@@ -476,6 +496,7 @@ export async function syncWithSupabase(
     const safeLocalJarak = Array.isArray(localJarakRecords) ? localJarakRecords : [];
 
     const mergedJarakMap = new Map<string, Jarak>();
+    const jarakUpsertBatch: any[] = [];
 
     for (const remote of safeRemoteJarak) {
       mergedJarakMap.set(remote.id || `${remote.date}_${remote.source}`, {
@@ -493,8 +514,8 @@ export async function syncWithSupabase(
       const key = local.id || `${local.date}_${local.source}`;
       const remote = mergedJarakMap.get(key);
       if (!remote) {
-        // Local only -> push to remote
-        const { error: insErr } = await client.from('jarak').upsert({
+        // Local only -> push to remote batch
+        jarakUpsertBatch.push({
           id: local.id || undefined,
           user_id: userId,
           date: local.date || new Date().toISOString().split('T')[0],
@@ -502,22 +523,29 @@ export async function syncWithSupabase(
           source: local.source || 'colota',
           updated_at: local.updated_at || new Date().toISOString()
         });
-        if (!insErr) {
-          local.user_id = userId;
-        }
+        local.user_id = userId;
         mergedJarakMap.set(key, local);
       } else {
         const localTime = new Date(local.updated_at || 0).getTime();
         const remoteTime = new Date(remote.updated_at || 0).getTime();
         if (localTime > remoteTime) {
-          await client.from('jarak').update({
-            date: local.date,
+          jarakUpsertBatch.push({
+            id: local.id || undefined,
+            user_id: userId,
+            date: local.date || new Date().toISOString().split('T')[0],
             total_km: Number(local.total_km || 0),
             source: local.source || 'colota',
             updated_at: local.updated_at || new Date().toISOString()
-          }).eq('id', local.id).eq('user_id', userId);
+          });
           mergedJarakMap.set(key, local);
         }
+      }
+    }
+
+    if (jarakUpsertBatch.length > 0) {
+      const { error: insErr } = await client.from('jarak').upsert(jarakUpsertBatch);
+      if (insErr) {
+        console.error('Gagal upload bulk jarak log:', insErr.message || insErr);
       }
     }
 
