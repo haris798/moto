@@ -495,6 +495,29 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                         </motion.p>
                       );
                     })()}
+
+                    {/* Quick Pick Icons: 15, 20, 25 (x1000 Rupiah) */}
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Input Cepat:</span>
+                      {[15, 20, 25].map((val) => (
+                        <motion.button
+                          key={val}
+                          type="button"
+                          whileHover={{ scale: 1.06 }}
+                          whileTap={{ scale: 0.94 }}
+                          onClick={() => setCost(val)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                            Number(cost) === val
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
+                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-600 hover:text-emerald-600 dark:hover:text-emerald-400'
+                          }`}
+                          title={`Set biaya Rp ${val}.000 (${((val * 1000) / (settings?.fuelPricePerLiter || 10000)).toFixed(2)} Liter)`}
+                        >
+                          <Droplets className={`w-3.5 h-3.5 ${Number(cost) === val ? 'text-white' : 'text-emerald-500'}`} />
+                          {val}k
+                        </motion.button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </form>
