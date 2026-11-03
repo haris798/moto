@@ -4,7 +4,7 @@ import { formatIDR } from '../utils/export';
 import { fetchJarakRecords } from '../lib/supabaseClient';
 import { getDBItem, setDBItem } from '../lib/dbStorage';
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   Line, AreaChart, Area
 } from 'recharts';
 import {
@@ -12,7 +12,8 @@ import {
   Timer, Flame,
   Battery, Wrench, Clock, Target, Milestone, Satellite,
   Filter, CalendarDays, Compass,
-  ListFilter, Eye, X, Search, Calendar
+  ListFilter, Eye, X, Search, Calendar,
+  ArrowUpDown, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -156,32 +157,115 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
     .filter(l => new Date(l.date).getMonth() === lastMonth.getMonth() && new Date(l.date).getFullYear() === lastMonth.getFullYear())
     .reduce((sum, l) => sum + l.cost, 0);
 
-  // Monthly chart data
-  const monthlyDataMap = new Map<string, { month: string; fuel: number; fuelLiters: number; oil: number; service: number }>();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const key = getMonthYearKey(d.toISOString());
-    monthlyDataMap.set(key, { month: key, fuel: 0, fuelLiters: 0, oil: 0, service: 0 });
+  // Filter & Pengaturan Tabel Pengeluaran Bulanan (BBM + Oli + Filter All)
+  const [expensePeriodFilter, setExpensePeriodFilter] = useState<string>('all'); // 'all', '6m', '12m', or 'year:YYYY'
+  const [expenseSortOrder, setExpenseSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // Struktur & Agregasi Pengeluaran Bulanan (BBM, Oli, Servis & Filter)
+  interface MonthlyExpenseRow {
+    key: string; // 'YYYY-MM'
+    year: number;
+    monthIndex: number;
+    monthLabel: string;
+    fuel: number;
+    fuelLiters: number;
+    oil: number;
+    service: number;
+    total: number;
   }
-  fuelLogs.forEach(log => {
-    const key = getMonthYearKey(log.date);
-    if (monthlyDataMap.has(key)) {
-      monthlyDataMap.get(key)!.fuel += log.cost;
-      monthlyDataMap.get(key)!.fuelLiters += (log.liters || 0);
+
+  const monthlyExpensesMap = new Map<string, MonthlyExpenseRow>();
+
+  const getOrCreateMonthRow = (d: Date): MonthlyExpenseRow => {
+    const year = d.getFullYear();
+    const monthIndex = d.getMonth();
+    const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+    if (!monthlyExpensesMap.has(key)) {
+      const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      monthlyExpensesMap.set(key, {
+        key,
+        year,
+        monthIndex,
+        monthLabel: `${monthNames[monthIndex]} ${year}`,
+        fuel: 0,
+        fuelLiters: 0,
+        oil: 0,
+        service: 0,
+        total: 0
+      });
     }
-    else monthlyDataMap.set(key, { month: key, fuel: log.cost, fuelLiters: log.liters || 0, oil: 0, service: 0 });
+    return monthlyExpensesMap.get(key)!;
+  };
+
+  fuelLogs.forEach(log => {
+    const row = getOrCreateMonthRow(new Date(log.date));
+    row.fuel += (log.cost || 0);
+    row.fuelLiters += (log.liters || 0);
   });
   oilLogs.forEach(log => {
-    const key = getMonthYearKey(log.date);
-    if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.oil += log.cost;
-    else monthlyDataMap.set(key, { month: key, fuel: 0, fuelLiters: 0, oil: log.cost, service: 0 });
+    const row = getOrCreateMonthRow(new Date(log.date));
+    row.oil += (log.cost || 0);
   });
   serviceLogs.forEach(log => {
-    const key = getMonthYearKey(log.date);
-    if (monthlyDataMap.has(key)) monthlyDataMap.get(key)!.service += log.cost;
-    else monthlyDataMap.set(key, { month: key, fuel: 0, fuelLiters: 0, oil: 0, service: log.cost });
+    const row = getOrCreateMonthRow(new Date(log.date));
+    row.service += (log.cost || 0);
   });
-  const sortedMonthlyData = Array.from(monthlyDataMap.values());
+
+  // Calculate row total
+  monthlyExpensesMap.forEach(row => {
+    row.total = row.fuel + row.oil + row.service;
+  });
+
+  // Pastikan minimal ada baris bulan berjalan jika data belum ada
+  if (monthlyExpensesMap.size === 0) {
+    getOrCreateMonthRow(new Date());
+  }
+
+  const allMonthlyExpenseRows = Array.from(monthlyExpensesMap.values());
+  const distinctExpenseYears = Array.from(new Set(allMonthlyExpenseRows.map(r => r.year))).sort((a, b) => b - a);
+
+  // Filter & Urutkan Baris Tabel Pengeluaran
+  const filteredMonthlyRows = allMonthlyExpenseRows
+    .filter(row => {
+      if (expensePeriodFilter === 'all') return true;
+      if (expensePeriodFilter === '6m') {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+        sixMonthsAgo.setDate(1);
+        const rowDate = new Date(row.year, row.monthIndex, 1);
+        return rowDate >= sixMonthsAgo;
+      }
+      if (expensePeriodFilter === '12m') {
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+        twelveMonthsAgo.setDate(1);
+        const rowDate = new Date(row.year, row.monthIndex, 1);
+        return rowDate >= twelveMonthsAgo;
+      }
+      if (expensePeriodFilter.startsWith('year:')) {
+        const y = parseInt(expensePeriodFilter.replace('year:', ''), 10);
+        return row.year === y;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (expenseSortOrder === 'desc') {
+        return b.key.localeCompare(a.key);
+      }
+      return a.key.localeCompare(b.key);
+    });
+
+  // Ringkasan Total untuk Tabel yang sedang difilter
+  const summaryExpenseTotals = filteredMonthlyRows.reduce(
+    (acc, r) => ({
+      fuel: acc.fuel + r.fuel,
+      fuelLiters: acc.fuelLiters + r.fuelLiters,
+      oil: acc.oil + r.oil,
+      service: acc.service + r.service,
+      total: acc.total + r.total,
+    }),
+    { fuel: 0, fuelLiters: 0, oil: 0, service: 0, total: 0 }
+  );
 
   // Mode Tampilan Grafik Efisiensi BBM
   type FuelMetricMode = 'km_l' | 'l_100km' | 'cost_km';
@@ -992,62 +1076,155 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
           </div>
         </motion.div>
 
-        {/* ── Monthly Expenses Chart ── */}
-        <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-sm lg:col-span-2">
-          <div className="p-5 pb-2">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
-                  <Activity className="w-4 h-4" />
+        {/* ── Monthly Expenses Table (BBM + Oli + Filter All) ── */}
+        <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-sm lg:col-span-2 flex flex-col justify-between">
+          {/* Header & Filter Controls */}
+          <div className="p-4 md:p-5 pb-3 border-b border-slate-100 dark:border-slate-800/60">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                  Tabel Pengeluaran Bulanan
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Rincian total BBM + Oli + Servis & Filter per bulan
+                </p>
+              </div>
+
+              {/* Filter controls */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Period Selector (Semua / All, 6 Bulan, 12 Bulan, Per Tahun) */}
+                <div className="relative inline-flex items-center">
+                  <Filter className="w-3.5 h-3.5 absolute left-2.5 text-slate-400 pointer-events-none" />
+                  <select
+                    value={expensePeriodFilter}
+                    onChange={(e) => setExpensePeriodFilter(e.target.value)}
+                    className="pl-7 pr-7 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-none focus:ring-1 focus:ring-rose-500 cursor-pointer appearance-none transition"
+                  >
+                    <option value="all">Semua Bulan (All)</option>
+                    <option value="6m">6 Bulan Terakhir</option>
+                    <option value="12m">12 Bulan Terakhir</option>
+                    {distinctExpenseYears.map(year => (
+                      <option key={year} value={`year:${year}`}>
+                        Tahun {year}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 absolute right-2 text-slate-400 pointer-events-none" />
                 </div>
-                Pengeluaran Bulanan
-              </h3>
+
+                {/* Sort Order Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setExpenseSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                  title={expenseSortOrder === 'desc' ? 'Urutkan dari bulan terlama' : 'Urutkan dari bulan terbaru'}
+                  className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span>{expenseSortOrder === 'desc' ? 'Terbaru' : 'Terlama'}</span>
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-slate-400">Biaya BBM dan servis oli per bulan</p>
           </div>
 
-          <div className="h-64 md:h-72 w-full px-2 pb-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sortedMonthlyData} margin={{ top: 10, right: 10, left: 5, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" className="dark:hidden" strokeOpacity={0.6} />
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" className="hidden dark:block" strokeOpacity={0.3} />
-                <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} stroke="#cbd5e1" className="dark:stroke-slate-800" />
-                <YAxis
-                  tick={{ fill: '#94a3b8', fontSize: 11 }}
-                  stroke="#cbd5e1"
-                  className="dark:stroke-slate-800"
-                  tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}jt` : v >= 1000 ? `${(v / 1000).toFixed(0)}rb` : `${v}`}
-                />
-                <Tooltip
-                  formatter={(value) => [formatIDR(Number(value)), '']}
-                  contentStyle={chartTooltipStyle}
-                  labelStyle={{ fontWeight: 'bold', color: '#cbd5e1', marginBottom: 6 }}
-                  itemStyle={{ padding: '2px 0' }}
-                />
-                <Legend
-                  iconType="circle"
-                  wrapperStyle={{ paddingTop: '12px', fontSize: '12px' }}
-                />
-                <Bar
-                  dataKey="fuel"
-                  name="Pembelian BBM"
-                  fill="#3b82f6"
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={32}
-                  animationDuration={1200}
-                  animationEasing="ease-out"
-                />
-                <Bar
-                  dataKey="oil"
-                  name="Servis / Oli"
-                  fill="#a78bfa"
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={32}
-                  animationDuration={1200}
-                  animationEasing="ease-out"
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Table Container */}
+          <div className="overflow-x-auto overflow-y-auto max-h-[300px] divide-y divide-slate-100 dark:divide-slate-800/60">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/90 dark:bg-slate-800/70 sticky top-0 backdrop-blur-xs z-10 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-2.5 px-3 md:px-4">Bulan</th>
+                  <th className="py-2.5 px-3 md:px-4 text-right">BBM</th>
+                  <th className="py-2.5 px-3 md:px-4 text-right">Oli</th>
+                  <th className="py-2.5 px-3 md:px-4 text-right">Servis & Filter</th>
+                  <th className="py-2.5 px-3 md:px-4 text-right font-bold text-rose-600 dark:text-rose-400">Total Pengeluaran</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 text-slate-700 dark:text-slate-200">
+                {filteredMonthlyRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400">
+                      Tidak ada catatan pengeluaran pada filter ini.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMonthlyRows.map((row) => (
+                    <tr
+                      key={row.key}
+                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 md:px-4 font-semibold text-slate-800 dark:text-white whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{row.monthLabel}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 md:px-4 text-right whitespace-nowrap font-medium text-blue-600 dark:text-blue-400">
+                        {row.fuel > 0 ? (
+                          <div>
+                            <div>{formatIDR(row.fuel)}</div>
+                            {row.fuelLiters > 0 && (
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {row.fuelLiters.toFixed(1)} L
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 md:px-4 text-right whitespace-nowrap font-medium text-purple-600 dark:text-purple-400">
+                        {row.oil > 0 ? formatIDR(row.oil) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="py-2.5 px-3 md:px-4 text-right whitespace-nowrap font-medium text-amber-600 dark:text-amber-400">
+                        {row.service > 0 ? formatIDR(row.service) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="py-2.5 px-3 md:px-4 text-right whitespace-nowrap font-bold text-slate-900 dark:text-white">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold">
+                          {formatIDR(row.total)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Table Summary Footer */}
+          <div className="p-3 md:px-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-800/40 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center sm:text-left">
+              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/50">
+                <div className="text-[10px] text-slate-400">Total BBM</div>
+                <div className="font-bold text-blue-600 dark:text-blue-400 truncate">
+                  {formatIDR(summaryExpenseTotals.fuel)}
+                </div>
+                {summaryExpenseTotals.fuelLiters > 0 && (
+                  <div className="text-[10px] text-slate-400">
+                    {summaryExpenseTotals.fuelLiters.toFixed(1)} L
+                  </div>
+                )}
+              </div>
+              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/50">
+                <div className="text-[10px] text-slate-400">Total Oli</div>
+                <div className="font-bold text-purple-600 dark:text-purple-400 truncate">
+                  {formatIDR(summaryExpenseTotals.oil)}
+                </div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/50">
+                <div className="text-[10px] text-slate-400">Total Servis / Filter</div>
+                <div className="font-bold text-amber-600 dark:text-amber-400 truncate">
+                  {formatIDR(summaryExpenseTotals.service)}
+                </div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900/60 border border-rose-100 dark:border-rose-900/40">
+                <div className="text-[10px] text-rose-500 font-medium">Grand Total</div>
+                <div className="font-extrabold text-rose-600 dark:text-rose-400 truncate">
+                  {formatIDR(summaryExpenseTotals.total)}
+                </div>
+              </div>
+            </div>
           </div>
         </motion.div>
       </div>
