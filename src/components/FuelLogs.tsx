@@ -39,7 +39,7 @@ const gpsIndicator = <Satellite className="w-2.5 h-2.5 text-cyan-500 shrink-0" /
 
 const getEfficiencyBadge = (eff: number | undefined) => {
   if (!eff) return (
-    <span 
+    <span
       className="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-full font-semibold"
       title="Sistem membutuhkan minimal 2 catatan pengisian BBM atau data jarak harian untuk menghitung efisiensi (km/L)"
     >
@@ -78,6 +78,10 @@ const getEfficiencyBadge = (eff: number | undefined) => {
 export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, settings }: FuelLogsProps) {
   const { showToast, showConfirm } = useToast();
 
+  // Harga bahan bakar aktual per liter (normalisasi satuan puluhan / ribuan IDR)
+  const rawFuelPrice = settings?.fuelPricePerLiter || 10000;
+  const actualPricePerLiter = rawFuelPrice < 1000 ? rawFuelPrice * 1000 : rawFuelPrice;
+
   // State lokal untuk manajemen modal form (Tambah/Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -85,7 +89,7 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
   const [cost, setCost] = useState<number | ''>('');
   const [formError, setFormError] = useState<string | null>(null);
   const [effCalculating, setEffCalculating] = useState(false); // Status kalkulasi efisiensi
-  
+
   // State lokal untuk urutan
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   // State untuk paginasi
@@ -179,9 +183,6 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
 
     // Support both thousands input (e.g. 20 -> 20.000) and full Rupiah (e.g. 20000 -> 20.000)
     const actualCost = cNumInput < 1000 ? cNumInput * 1000 : cNumInput;
-
-    const rawFuelPrice = settings?.fuelPricePerLiter || 10000;
-    const actualPricePerLiter = rawFuelPrice < 1000 ? rawFuelPrice * 1000 : rawFuelPrice;
 
     const calculatedLiters = Number((actualCost / actualPricePerLiter).toFixed(2));
     const lNum = calculatedLiters > 0 ? calculatedLiters : 0.01;
@@ -479,9 +480,7 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                     {cost && Number(cost) > 0 && (() => {
                       const rawC = Number(cost);
                       const actC = rawC < 1000 ? rawC * 1000 : rawC;
-                      const rawP = settings?.fuelPricePerLiter || 10000;
-                      const actP = rawP < 1000 ? rawP * 1000 : rawP;
-                      const calculatedLiters = (actC / actP).toFixed(2);
+                      const calculatedLiters = (actC / actualPricePerLiter).toFixed(2);
                       return (
                         <motion.p
                           initial={{ opacity: 0, y: -5 }}
@@ -499,25 +498,41 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                     {/* Quick Pick Icons: 15, 20, 25 (x1000 Rupiah) */}
                     <div className="flex items-center gap-2 mt-3">
                       <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Input Cepat:</span>
-                      {[15, 20, 25].map((val) => (
-                        <motion.button
-                          key={val}
-                          type="button"
-                          whileHover={{ scale: 1.06 }}
-                          whileTap={{ scale: 0.94 }}
-                          onClick={() => setCost(val)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                            Number(cost) === val
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
-                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-600 hover:text-emerald-600 dark:hover:text-emerald-400'
-                          }`}
-                          title={`Set biaya Rp ${val}.000 (${((val * 1000) / (settings?.fuelPricePerLiter || 10000)).toFixed(2)} Liter)`}
-                        >
-                          <Droplets className={`w-3.5 h-3.5 ${Number(cost) === val ? 'text-white' : 'text-emerald-500'}`} />
-                          {val}k
-                        </motion.button>
-                      ))}
+                      {[15, 20, 25].map((val) => {
+                        const isSelected = Number(cost) === val || Number(cost) === val * 1000;
+                        const litersForVal = ((val * 1000) / actualPricePerLiter).toFixed(2);
+                        return (
+                          <motion.button
+                            key={val}
+                            type="button"
+                            whileHover={{ scale: 1.06 }}
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setCost(val * 1000)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${isSelected
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
+                                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-600 hover:text-emerald-600 dark:hover:text-emerald-400'
+                              }`}
+                            title={`Pilih biaya Rp ${val}.000 (${litersForVal} Liter)`}
+                          >
+                            <Droplets className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-emerald-500'}`} />
+                            {val}k
+                          </motion.button>
+                        );
+                      })}
                     </div>
+                  </div>
+
+                  {/* Tombol Simpan di dalam Form */}
+                  <div className="pt-2">
+                    <button
+                      id="btn-submit-fuel-modal"
+                      type="submit"
+                      disabled={effCalculating}
+                      className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60 text-sm"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{effCalculating ? 'Menyimpan & Menghitung...' : editingId ? 'Simpan Perubahan' : 'Simpan Catatan BBM'}</span>
+                    </button>
                   </div>
                 </div>
               </form>
@@ -555,17 +570,15 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
               <motion.div
                 key={i}
                 variants={scaleIn}
-                className={`p-3 rounded-xl border text-center ${
-                  stat.color === 'blue'
+                className={`p-3 rounded-xl border text-center ${stat.color === 'blue'
                     ? 'bg-blue-50/60 dark:bg-blue-950/20 border-blue-100/60 dark:border-blue-900/30'
                     : stat.color === 'emerald'
                       ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-100/60 dark:border-emerald-900/30'
                       : 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-100/60 dark:border-amber-900/30'
-                }`}
+                  }`}
               >
-                <stat.icon className={`w-4 h-4 mx-auto mb-1 ${
-                  stat.color === 'blue' ? 'text-blue-500' : stat.color === 'emerald' ? 'text-emerald-500' : 'text-amber-500'
-                }`} />
+                <stat.icon className={`w-4 h-4 mx-auto mb-1 ${stat.color === 'blue' ? 'text-blue-500' : stat.color === 'emerald' ? 'text-emerald-500' : 'text-amber-500'
+                  }`} />
                 <span className="block text-[10px] font-semibold tracking-wider text-slate-400">{stat.label}</span>
                 <span className="text-sm md:text-base font-extrabold text-slate-800 dark:text-white">{stat.value}</span>
               </motion.div>
@@ -603,8 +616,8 @@ export default function FuelLogs({ logs, onAddLog, onEditLog, onDeleteLog, setti
                         {log.efficiency && log.liters > 0
                           ? Math.round(log.efficiency * log.liters).toLocaleString('id-ID')
                           : log.mileage > 0
-                          ? log.mileage.toLocaleString('id-ID')
-                          : '-'} km
+                            ? log.mileage.toLocaleString('id-ID')
+                            : '-'} km
                       </td>
                       <td className="p-4 text-sm font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                         {formatIDR(log.cost)}

@@ -57,7 +57,9 @@ export default function SettingsTab({
   // Local form state untuk Interval (Jarak/Hari)
   const [intervalKm, setIntervalKm] = useState(settings.oilChangeIntervalKm);
   const [intervalDays, setIntervalDays] = useState(settings.oilChangeIntervalDays);
-  const [fuelPrice, setFuelPrice] = useState(settings.fuelPricePerLiter || 10);
+  const rawInitialFuelPrice = settings.fuelPricePerLiter || 10000;
+  const initialFuelPrice = rawInitialFuelPrice < 1000 ? rawInitialFuelPrice * 1000 : rawInitialFuelPrice;
+  const [fuelPrice, setFuelPrice] = useState(initialFuelPrice);
 
   // App auto update state
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -110,7 +112,7 @@ export default function SettingsTab({
       ...settings,
       oilChangeIntervalKm: Number(intervalKm),
       oilChangeIntervalDays: Number(intervalDays),
-      fuelPricePerLiter: Number(fuelPrice)
+      fuelPricePerLiter: Number(fuelPrice) > 0 && Number(fuelPrice) < 1000 ? Number(fuelPrice) * 1000 : Number(fuelPrice)
     });
     showToast('Pengaturan interval ganti oli & harga BBM berhasil disimpan!', 'success', 'Pengaturan Tersimpan');
   };

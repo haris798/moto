@@ -188,6 +188,9 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
   const [fuelMetricMode, setFuelMetricMode] = useState<FuelMetricMode>('km_l');
 
   // Comprehensive Efficiency & Consumption trend per kilometer
+  const rawFuelPrice = settings.fuelPricePerLiter || 10000;
+  const actualFuelPrice = rawFuelPrice < 1000 ? rawFuelPrice * 1000 : rawFuelPrice;
+
   const efficiencyTrendData = [...fuelLogs]
     .filter(l => l.efficiency && l.efficiency > 0)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -195,7 +198,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
     .map(log => {
       const kmL = Number(log.efficiency?.toFixed(1)) || 0;
       const l100 = kmL > 0 ? Number((100 / kmL).toFixed(2)) : 0;
-      const pricePerLiter = log.cost && log.liters && log.liters > 0 ? log.cost / log.liters : settings.fuelPricePerLiter || 10000;
+      const pricePerLiter = log.cost && log.liters && log.liters > 0 ? log.cost / log.liters : actualFuelPrice;
       const costPerKm = kmL > 0 ? Math.round(pricePerLiter / kmL) : 0;
 
       return {
@@ -210,7 +213,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
         'Biaya/km (Rp)': costPerKm,
         'Rata-rata km/L': Number(avgEfficiency.toFixed(1)),
         'Rata-rata L/100km': avgEfficiency > 0 ? Number((100 / avgEfficiency).toFixed(2)) : 0,
-        'Rata-rata Biaya/km': avgEfficiency > 0 ? Math.round((settings.fuelPricePerLiter || 10000) / avgEfficiency) : 0
+        'Rata-rata Biaya/km': avgEfficiency > 0 ? Math.round(actualFuelPrice / avgEfficiency) : 0
       };
     });
 
@@ -1275,7 +1278,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                   Biaya per KM
                 </span>
                 <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
-                  {avgEfficiency > 0 ? `Rp ${(settings.fuelPricePerLiter / avgEfficiency).toFixed(0)}` : '—'}
+                  {avgEfficiency > 0 ? `Rp ${(actualFuelPrice / avgEfficiency).toFixed(0)}` : '—'}
                 </span>
                 <p className="text-[10px] text-slate-400 mt-0.5">Rupiah per kilometer</p>
               </div>
@@ -1295,7 +1298,7 @@ export default function Dashboard({ oilLogs, fuelLogs, serviceLogs = [], setting
                   Est. Biaya 100 KM
                 </span>
                 <span className="text-base font-extrabold text-slate-800 dark:text-white tabular-nums">
-                  {avgEfficiency > 0 ? formatIDR((100 / avgEfficiency) * (settings.fuelPricePerLiter || 10000)) : '—'}
+                  {avgEfficiency > 0 ? formatIDR((100 / avgEfficiency) * actualFuelPrice) : '—'}
                 </span>
                 <p className="text-[10px] text-slate-400 mt-0.5">Estimasi touring 100km</p>
               </div>

@@ -20,7 +20,7 @@ import {
 const DEFAULT_SETTINGS: AppSettings = {
   oilChangeIntervalKm: 2000,
   oilChangeIntervalDays: 90,
-  fuelPricePerLiter: 10,
+  fuelPricePerLiter: 10000,
   telegram: {
     botToken: '',
     chatId: '',
@@ -89,6 +89,9 @@ export default function App() {
       let loadedSettings = DEFAULT_SETTINGS;
       if (cachedSettings) {
         loadedSettings = { ...DEFAULT_SETTINGS, ...cachedSettings };
+        if (loadedSettings.fuelPricePerLiter && loadedSettings.fuelPricePerLiter < 1000) {
+          loadedSettings.fuelPricePerLiter = loadedSettings.fuelPricePerLiter * 1000;
+        }
         setSettings(loadedSettings);
       }
 
