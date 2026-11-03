@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -12,39 +12,83 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js (Node 22 for Capacitor 8)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: 'npm'
+          node-version: '22.x'
 
-      - name: Install Node Dependencies
-        run: npm ci
+      - name: Verify Node
+        run: |
+          node -v
+          npm -v
 
-      - name: Build Web Assets
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Install Capacitor Android
+        run: npm install @capacitor/android@latest --save
+
+      - name: Build Web Application
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
         run: npm run build
 
-      - name: Set up JDK 21
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
 
-      - name: Sync Capacitor Android
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Create Android Platform
+        run: |
+          rm -rf android
+          npx cap add android
+
+      - name: Generate & Inject Android App Icons
+        run: |
+          npm install sharp --no-save
+          node scripts/generate-icons.js
+          node scripts/generate-android-icons.js
+
+      - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build Android APK
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
-      - name: Upload APK Artifact
+      - name: Read App Name
+        run: |
+          APP_NAME="Motorku"
+          SAFE_NAME=$(echo "$APP_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
+          echo "APP_NAME=$SAFE_NAME" >> $GITHUB_ENV
+
+      - name: Rename APK
+        run: |
+          APK=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "APK tidak ditemukan!"
+            exit 1
+          fi
+
+          cp "$APK" "android/app/build/outputs/apk/${APP_NAME}.apk"
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/*.apk
-          retention-days: 7
+          name: ${{ env.APP_NAME }}
+          path: android/app/build/outputs/apk/${{ env.APP_NAME }}.apk
