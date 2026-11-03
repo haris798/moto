@@ -27,14 +27,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
-      - name: Install Capacitor Android
-        run: npm install @capacitor/android@latest --save
+      - name: Verify Capacitor Dependencies
+        run: |
+          npm list @capacitor/core @capacitor/android @capacitor/cli || npm install @capacitor/android@^8.4.2 --no-audit --no-fund
 
       - name: Build Web Application
         env:
